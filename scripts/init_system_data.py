@@ -46,7 +46,7 @@ async def create_default_users(db):
     admin_user = {
         "username": "admin",
         "email": "admin@tradingagents.cn",
-        "hashed_password": get_password_hash("admin123456"),
+        "hashed_password": get_password_hash("admin123"),
         "full_name": "系统管理员",
 
         "is_active": True,
@@ -63,7 +63,7 @@ async def create_default_users(db):
     await users_collection.insert_one(admin_user)
     logger.info("✓ 创建管理员用户成功")
     logger.info("  用户名: admin")
-    logger.info("  密码: admin123456")
+    logger.info("  密码: admin123")
     logger.info("  ⚠️  请在首次登录后立即修改密码！")
     
     # 创建默认测试用户
@@ -334,7 +334,7 @@ async def main():
         logger.info("1. 启动后端服务: python -m uvicorn app.main:app --reload")
         logger.info("2. 启动前端服务: cd frontend && npm run dev")
         logger.info("3. 访问应用: http://localhost:5173")
-        logger.info("4. 使用管理员账号登录: admin / admin123456")
+        logger.info("4. 使用管理员账号登录: admin / admin123")
         logger.info("\n⚠️  重要: 请在首次登录后立即修改管理员密码！")
         
     except Exception as e:

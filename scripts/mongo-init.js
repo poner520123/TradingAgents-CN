@@ -10,7 +10,7 @@ db = db.getSiblingDB('admin');
 try {
   db.createUser({
     user: 'tradingagents',
-    pwd: 'tradingagents123456',
+    pwd: 'admin123',
     roles: [
       {
         role: 'readWrite',
@@ -207,7 +207,7 @@ print('TradingAgents数据库初始化完成！');
 print('========================================');
 print('数据库: tradingagents');
 print('用户: tradingagents');
-print('密码: tradingagents123');
+print('密码: admin123');
 print('集合数: ' + collections.length);
 print('索引数: ' + indexes);
 print('========================================');
