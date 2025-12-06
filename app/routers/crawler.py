@@ -9,11 +9,9 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# Shared service instance
-_crawler_service = CrawlerService()
-
 def get_crawler_service():
-    return _crawler_service
+    # Create a new instance each time to ensure we use the latest code
+    return CrawlerService()
 
 @router.get("/list", response_model=CrawlerDataListResponse, tags=["crawler"])
 async def get_crawler_data(

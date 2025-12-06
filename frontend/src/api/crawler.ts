@@ -5,6 +5,7 @@ export interface CrawlerData {
   success_count: string
   success_rate: string
   stock_name: string
+  stock_code?: string
   reason: string
   time: string
   price: string

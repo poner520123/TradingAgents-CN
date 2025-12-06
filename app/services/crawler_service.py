@@ -341,10 +341,18 @@ class CrawlerService:
             return 0
             
         count = 0
+        # Import here to avoid circular import
+        from app.services.stock_map_service import stock_map_service
+        
         for item in data_list:
             try:
                 # Add timestamp
                 item['crawled_at'] = datetime.utcnow()
+                
+                # Add stock_code to item
+                if 'stock_name' in item:
+                    stock_code = stock_map_service.get_code_by_name(item['stock_name'])
+                    item['stock_code'] = stock_code
                 
                 # Upsert based on unique keys
                 result = self.collection.update_one(
@@ -363,6 +371,63 @@ class CrawlerService:
             except Exception as e:
                 logger.error(f"Error saving data: {e}")
         return count
+    
+    def update_historical_stock_codes(self):
+        """更新历史爬虫数据中的股票代码"""
+        logger.info("开始更新历史爬虫数据中的股票代码")
+        
+        # Import here to avoid circular import
+        from app.services.stock_map_service import stock_map_service
+        
+        # 获取所有缺少stock_code的文档
+        cursor = self.collection.find({"stock_code": {"$exists": False}})
+        total = self.collection.count_documents({"stock_code": {"$exists": False}})
+        updated = 0
+        
+        if total == 0:
+            logger.info("没有需要更新的历史数据")
+            return {"total": 0, "updated": 0}
+        
+        logger.info(f"找到 {total} 条缺少stock_code的历史数据，开始更新")
+        
+        # 按批次处理，每批100条
+        batch_size = 100
+        batch = []
+        
+        for doc in cursor:
+            batch.append(doc)
+            
+            if len(batch) == batch_size:
+                # 批量获取股票代码
+                names = [d['stock_name'] for d in batch]
+                code_map = stock_map_service.get_codes_by_names(names)
+                
+                # 更新批次中的文档
+                for d in batch:
+                    if d['stock_name'] in code_map:
+                        self.collection.update_one(
+                            {"_id": d["_id"]},
+                            {"$set": {"stock_code": code_map[d['stock_name']]}}
+                        )
+                        updated += 1
+                
+                batch = []
+        
+        # 处理剩余的文档
+        if batch:
+            names = [d['stock_name'] for d in batch]
+            code_map = stock_map_service.get_codes_by_names(names)
+            
+            for d in batch:
+                if d['stock_name'] in code_map:
+                    self.collection.update_one(
+                        {"_id": d["_id"]},
+                        {"$set": {"stock_code": code_map[d['stock_name']]}}
+                    )
+                    updated += 1
+        
+        logger.info(f"历史爬虫数据股票代码更新完成，共处理 {total} 条，成功更新 {updated} 条")
+        return {"total": total, "updated": updated}
 
     def get_data(self, page=1, page_size=20):
         """Retrieve data for API."""
@@ -370,10 +435,17 @@ class CrawlerService:
         total = self.collection.count_documents({})
         cursor = self.collection.find().sort("time", DESCENDING).skip(skip).limit(page_size)
         data = list(cursor)
-        # Convert ObjectId to string
+        # Convert ObjectId to string and process data types
         for d in data:
             if '_id' in d:
                 d['_id'] = str(d['_id'])
+            
+            # Ensure success_count is an integer
+            if 'success_count' in d:
+                try:
+                    d['success_count'] = int(d['success_count'])
+                except (ValueError, TypeError):
+                    d['success_count'] = 0
         return data, total
 
     def crawl_pages(self, start_page, end_page, force=False):

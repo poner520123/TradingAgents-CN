@@ -18,6 +18,11 @@
 
       <!-- 爬虫数据列表 -->
       <el-table :data="tableData" style="width: 100%" v-loading="loading" border stripe>
+        <el-table-column prop="stock_code" label="股票代码" width="120" fixed>
+          <template #default="scope">
+            <span class="font-bold">{{ scope.row.stock_code || '未知' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="stock_name" label="股票名称" width="120" fixed>
           <template #default="scope">
             <span class="font-bold">{{ scope.row.stock_name }}</span>
@@ -83,6 +88,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { DataAnalysis } from '@element-plus/icons-vue'
 import { getCrawlerData, startCrawl, type CrawlerData } from '@/api/crawler'
+import { getStockCodeByName, loadStockNameCodeMap } from '@/utils/stockNameCodeMap'
 
 const router = useRouter()
 const loading = ref(false)
@@ -93,13 +99,21 @@ const pageSize = ref(20)
 const total = ref(0)
 const crawlPages = ref(1)
 
+// 页面加载时初始化股票名称到代码的映射
+onMounted(async () => {
+  await loadStockNameCodeMap()
+  await fetchData()
+})
+
 const fetchData = async () => {
   loading.value = true
   try {
     const res = await getCrawlerData(currentPage.value, pageSize.value)
-    if (res.data) {
-      tableData.value = res.data.data
-      total.value = res.data.total
+    if (res.success) {
+      tableData.value = res.data
+      total.value = res.total
+      // 为每个股票获取股票代码
+      await fetchStockCodes()
     }
   } catch (error) {
     console.error('Failed to fetch crawler data:', error)
@@ -109,18 +123,35 @@ const fetchData = async () => {
   }
 }
 
+const fetchStockCodes = async () => {
+  // 遍历所有股票数据，为没有股票代码的股票获取代码
+  for (const item of tableData.value) {
+    if (!item.stock_code) {
+      try {
+        // 从本地映射中获取股票代码
+        const code = await getStockCodeByName(item.stock_name)
+        if (code) {
+          item.stock_code = code
+        }
+      } catch (error) {
+        console.error(`Failed to get stock code for ${item.stock_name}:`, error)
+      }
+    }
+  }
+}
+
 const handleStartCrawl = async () => {
   crawling.value = true
   try {
     const res = await startCrawl(crawlPages.value)
-    if (res.data && res.data.success) {
+    if (res.success) {
       ElMessage.success(`开始爬取前 ${crawlPages.value} 页数据，请稍后刷新查看`)
       // Refresh after a short delay to see initial results
       setTimeout(() => {
         fetchData()
       }, 2000)
     } else {
-      ElMessage.error(res.data?.message || '启动爬取失败')
+      ElMessage.error(res.message || '启动爬取失败')
     }
   } catch (error) {
     console.error('Failed to start crawl:', error)
@@ -131,12 +162,11 @@ const handleStartCrawl = async () => {
 }
 
 const analyzeStock = (row: CrawlerData) => {
-  // Try to extract stock code if available or just pass the name
-  // The crawler data might not have the code directly, so we pass the name
-  // SingleAnalysis will try to find the code
+  // 如果有股票代码，直接使用股票代码，否则使用股票名称
+  const stockParam = row.stock_code || row.stock_name
   router.push({
     path: '/analysis/single',
-    query: { stock: row.stock_name } // Pass stock name, SingleAnalysis maps it
+    query: { stock: stockParam }
   })
 }
 

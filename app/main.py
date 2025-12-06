@@ -59,6 +59,7 @@ from app.routers.multi_source_sync import router as multi_source_sync_router
 from app.routers.stocks import router as stocks_router
 from app.routers.stock_data import router as stock_data_router
 from app.routers.stock_sync import router as stock_sync_router
+from app.routers.stock_map import router as stock_map_router
 from app.routers.multi_market_stocks import router as multi_market_stocks_router
 from app.routers.notifications import router as notifications_router
 from app.routers.websocket_notifications import router as websocket_notifications_router
@@ -716,59 +717,7 @@ async def test_log():
     print("🧪 测试端点被调用 - 这条消息应该出现在控制台")
     return {"message": "测试成功", "timestamp": time.time()}
 
-# 直接添加crawler路由，绕过复杂的路由注册
-@app.get("/api/crawler/list")
-async def get_crawler_list(page: int = 1, page_size: int = 20):
-    """直接处理crawler list请求"""
-    from app.services.crawler_service import CrawlerService
-    from app.models.crawler_models import CrawlerDataListResponse
-    
-    print(f"🐛 直接处理crawler list请求 - page: {page}, page_size: {page_size}")
-    
-    try:
-        service = CrawlerService()
-        data, total = service.get_data(page, page_size)
-        return CrawlerDataListResponse(
-            success=True,
-            data=data,
-            total=total,
-            page=page,
-            page_size=page_size
-        )
-    except Exception as e:
-        print(f"❌ 获取爬虫数据失败: {e}")
-        return CrawlerDataListResponse(
-            success=False,
-            message=f"Error fetching data: {str(e)}",
-            data=[],
-            total=0,
-            page=page,
-            page_size=page_size
-        )
 
-# 直接添加crawl路由
-@app.post("/api/crawler/crawl")
-async def start_crawl(request: dict, background_tasks):
-    """直接处理crawl请求"""
-    from app.services.crawler_service import CrawlerService
-    
-    print(f"🐛 直接处理crawl请求 - pages: {request.get('pages', 1)}")
-    
-    try:
-        service = CrawlerService()
-        pages = request.get('pages', 1)
-        background_tasks.add_task(service.crawl_pages, 1, pages)
-        
-        return {
-            "success": True, 
-            "message": f"Started crawling {pages} pages in background."
-        }
-    except Exception as e:
-        print(f"❌ 启动爬虫失败: {e}")
-        return {
-            "success": False, 
-            "message": f"Failed to start crawl: {str(e)}"
-        }
 
 
 
@@ -824,6 +773,9 @@ app.include_router(internal_messages_router, tags=["internal-messages"])
 
 # 爬虫路由
 app.include_router(crawler_router, prefix="/api", tags=["crawler"])
+
+# 股票名称代码映射路由
+app.include_router(stock_map_router, prefix="/api", tags=["stock-map"])
 
 
 @app.get("/")
