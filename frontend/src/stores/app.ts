@@ -48,7 +48,7 @@ export const useAppStore = defineStore('app', {
     lastApiCheck: 0,
 
     sidebarCollapsed: useStorage('sidebar-collapsed', false).value || false,
-    sidebarWidth: useStorage('sidebar-width', 240).value || 240,
+    sidebarWidth: useStorage('sidebar-width', 276).value || 276,
 
     currentRoute: null,
 

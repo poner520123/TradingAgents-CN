@@ -3163,28 +3163,38 @@ onMounted(async () => {
 }
 
 .report-content {
-  line-height: 1.6;
+  line-height: 1.5;
   color: #374151;
-}
+  font-size: 15px;
 
-.report-content h1,
-.report-content h2,
-.report-content h3 {
-  color: #1f2937;
-  margin: 16px 0 8px 0;
-}
+  /* 标题样式 */
+  h1, h2, h3, h4, h5, h6 {
+    color: #1f2937 !important;
+    margin: 12px 0 8px 0 !important;
+    font-weight: 600 !important;
+  }
 
-.report-content strong {
-  color: #1f2937;
-}
+  h1 { font-size: 22px !important; }
+  h2 { font-size: 18px !important; }
+  h3 { font-size: 16px !important; }
+  h4 { font-size: 15px !important; }
 
-.result-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
-}
+  /* 段落样式 */
+  p {
+    margin: 8px 0 !important;
+    line-height: 1.5 !important;
+  }
+
+  /* 列表样式 */
+  ul, ol {
+    margin: 8px 0 !important;
+    padding-left: 20px !important;
+
+    li {
+      margin: 4px 0 !important;
+      line-height: 1.5 !important;
+    }
+  }
 
 /* 分析报告标签页样式 */
 .analysis-tabs-container {

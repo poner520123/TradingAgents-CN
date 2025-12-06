@@ -59,19 +59,6 @@ def create_research_manager(llm, memory):
 
 新闻分析：{news_report}
 
-基本面分析：{fundamentals_report}
-
-以下是辩论：
-辩论历史：
-{history}
-
-请用中文撰写所有分析内容和建议。"""
-
-        # 📊 统计 prompt 大小
-        prompt_length = len(prompt)
-        estimated_tokens = int(prompt_length / 1.8)
-
-        logger.info(f"📊 [Research Manager] Prompt 统计:")
         logger.info(f"   - 辩论历史长度: {len(history)} 字符")
         logger.info(f"   - 总 Prompt 长度: {prompt_length} 字符")
         logger.info(f"   - 估算输入 Token: ~{estimated_tokens} tokens")
