@@ -51,6 +51,9 @@
       </div>
     </el-card>
 
+    <!-- 随机股票推荐卡片 -->
+    <RandomStocksCard />
+
     <!-- 主要功能区域 -->
     <el-row :gutter="24" class="main-content">
       <!-- 左侧：快速操作 -->
@@ -318,7 +321,6 @@ import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
 import { analysisApi } from '@/api/analysis'
 import { newsApi } from '@/api/news'
-import { paperApi, type PaperAccountSummary } from '@/api/paper'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -354,8 +356,7 @@ const favoriteStocks = ref<any[]>([])
 const marketNews = ref<any[]>([])
 const syncingNews = ref(false)
 
-// 模拟交易账户数据
-const paperAccount = ref<PaperAccountSummary | null>(null)
+
 
 
 
@@ -551,35 +552,7 @@ const loadMarketNews = async () => {
   }
 }
 
-// 加载模拟交易账户信息
-const loadPaperAccount = async () => {
-  try {
-    const response = await paperApi.getAccount()
-    if (response.success && response.data) {
-      paperAccount.value = response.data.account
-    }
-  } catch (error) {
-    console.error('加载模拟交易账户失败:', error)
-    paperAccount.value = null
-  }
-}
 
-// 跳转到模拟交易页面
-const goToPaperTrading = () => {
-  router.push('/paper')
-}
-
-// 格式化金额
-const formatMoney = (value: number) => {
-  return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
-
-// 获取盈亏样式类
-const getPnlClass = (pnl: number) => {
-  if (pnl > 0) return 'price-up'
-  if (pnl < 0) return 'price-down'
-  return 'price-neutral'
-}
 
 const syncMarketNews = async () => {
   try {
@@ -616,8 +589,6 @@ onMounted(async () => {
   await loadRecentAnalyses()
   // 加载市场快讯
   await loadMarketNews()
-  // 加载模拟交易账户
-  await loadPaperAccount()
 })
 </script>
 
