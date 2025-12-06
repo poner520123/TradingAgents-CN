@@ -3195,6 +3195,7 @@ onMounted(async () => {
       line-height: 1.5 !important;
     }
   }
+}
 
 /* 分析报告标签页样式 */
 .analysis-tabs-container {

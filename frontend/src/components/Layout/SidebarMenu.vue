@@ -23,6 +23,8 @@
       </template>
       <el-menu-item index="/analysis/single">单股分析</el-menu-item>
       <el-menu-item index="/analysis/batch">批量分析</el-menu-item>
+      <!-- 新增：爬虫分析 -->
+      <el-menu-item index="/analysis/crawler">爬虫分析</el-menu-item>
       <!-- 新增：将分析报告作为股票分析的子菜单 -->
       <el-menu-item index="/reports">分析报告</el-menu-item>
     </el-sub-menu>

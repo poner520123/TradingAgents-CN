@@ -50,7 +50,7 @@ def create_research_manager(llm, memory):
 考虑您在类似情况下的过去错误。利用这些见解来完善您的决策制定，确保您在学习和改进。以对话方式呈现您的分析，就像自然说话一样，不使用特殊格式。
 
 以下是您对错误的过去反思：
-\"{past_memory_str}\"
+"{past_memory_str}"
 
 以下是综合分析报告：
 市场研究：{market_research_report}
@@ -59,6 +59,16 @@ def create_research_manager(llm, memory):
 
 新闻分析：{news_report}
 
+基本面报告：{fundamentals_report}
+
+辩论历史：
+{history}
+"""
+
+        # 📊 统计提示信息
+        prompt_length = len(prompt)
+        estimated_tokens = int(prompt_length / 1.8)
+        
         logger.info(f"   - 辩论历史长度: {len(history)} 字符")
         logger.info(f"   - 总 Prompt 长度: {prompt_length} 字符")
         logger.info(f"   - 估算输入 Token: ~{estimated_tokens} tokens")

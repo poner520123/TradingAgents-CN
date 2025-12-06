@@ -64,9 +64,8 @@ yarn-error.log*
 *.tgz
 .yarn-integrity
 
-# 前端构建产物（在Dockerfile中会重新构建）
-# 注意：只排除构建产物和node_modules，不排除源代码
-frontend/dist/
+# 前端构建产物（保留本地构建的dist，在Dockerfile中直接复制）
+# 注意：只排除node_modules，不排除源代码和构建产物
 frontend/node_modules/
 frontend/.vite/
 frontend/coverage/

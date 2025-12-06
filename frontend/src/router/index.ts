@@ -55,6 +55,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Analysis',
     component: () => import('@/layouts/BasicLayout.vue'),
     redirect: '/analysis/single',
+    meta: {
+      title: '股票分析',
+      icon: 'TrendCharts',
+      requiresAuth: true,
+      transition: 'fade'
+    },
     children: [
       {
         path: 'single',
@@ -65,6 +71,15 @@ const routes: RouteRecordRaw[] = [
         path: 'batch',
         name: 'BatchAnalysis',
         component: () => import('@/views/Analysis/BatchAnalysis.vue')
+      },
+      {
+        path: 'crawler',
+        name: 'CrawlerAnalysis',
+        component: () => import('@/views/Analysis/CrawlerAnalysis.vue'),
+        meta: {
+          title: '爬虫分析',
+          requiresAuth: true
+        }
       },
 
     ]

@@ -28,15 +28,49 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.logging_config import setup_logging
-from app.routers import auth_db as auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init, akshare_init, baostock_init, historical_data, multi_period_sync, financial_data, news_data, social_media, internal_messages, usage_statistics, model_capabilities, cache, logs
-from app.routers import sync as sync_router, multi_source_sync
-from app.routers import stocks as stocks_router
-from app.routers import stock_data as stock_data_router
-from app.routers import stock_sync as stock_sync_router
-from app.routers import multi_market_stocks as multi_market_stocks_router
-from app.routers import notifications as notifications_router
-from app.routers import websocket_notifications as websocket_notifications_router
-from app.routers import scheduler as scheduler_router
+from app.routers.auth_db import router as auth_router
+from app.routers.analysis import router as analysis_router
+from app.routers.screening import router as screening_router
+from app.routers.queue import router as queue_router
+from app.routers.sse import router as sse_router
+from app.routers.health import router as health_router
+from app.routers.favorites import router as favorites_router
+from app.routers.config import router as config_router
+from app.routers.reports import router as reports_router
+from app.routers.database import router as database_router
+from app.routers.operation_logs import router as operation_logs_router
+from app.routers.tags import router as tags_router
+from app.routers.tushare_init import router as tushare_init_router
+from app.routers.akshare_init import router as akshare_init_router
+from app.routers.baostock_init import router as baostock_init_router
+from app.routers.historical_data import router as historical_data_router
+from app.routers.multi_period_sync import router as multi_period_sync_router
+from app.routers.financial_data import router as financial_data_router
+from app.routers.news_data import router as news_data_router
+from app.routers.social_media import router as social_media_router
+from app.routers.internal_messages import router as internal_messages_router
+from app.routers.usage_statistics import router as usage_statistics_router
+from app.routers.model_capabilities import router as model_capabilities_router
+from app.routers.cache import router as cache_router
+from app.routers.logs import router as logs_router
+from app.routers.crawler import router as crawler_router
+from app.routers.sync import router as sync_router
+from app.routers.multi_source_sync import router as multi_source_sync_router
+from app.routers.stocks import router as stocks_router
+from app.routers.stock_data import router as stock_data_router
+from app.routers.stock_sync import router as stock_sync_router
+from app.routers.multi_market_stocks import router as multi_market_stocks_router
+from app.routers.notifications import router as notifications_router
+from app.routers.websocket_notifications import router as websocket_notifications_router
+from app.routers.scheduler import router as scheduler_router
+
+# Alias for backward compatibility
+auth = auth_router
+from app.routers.multi_market_stocks import router as multi_market_stocks_router
+from app.routers.notifications import router as notifications_router
+from app.routers.websocket_notifications import router as websocket_notifications_router
+from app.routers.system_config import router as system_config_router
+from app.routers.paper import router as paper_router
 from app.services.basics_sync_service import get_basics_sync_service
 from app.services.multi_source_basics_sync_service import MultiSourceBasicsSyncService
 from app.services.scheduler_service import set_scheduler_instance
@@ -682,52 +716,114 @@ async def test_log():
     print("🧪 测试端点被调用 - 这条消息应该出现在控制台")
     return {"message": "测试成功", "timestamp": time.time()}
 
+# 直接添加crawler路由，绕过复杂的路由注册
+@app.get("/api/crawler/list")
+async def get_crawler_list(page: int = 1, page_size: int = 20):
+    """直接处理crawler list请求"""
+    from app.services.crawler_service import CrawlerService
+    from app.models.crawler_models import CrawlerDataListResponse
+    
+    print(f"🐛 直接处理crawler list请求 - page: {page}, page_size: {page_size}")
+    
+    try:
+        service = CrawlerService()
+        data, total = service.get_data(page, page_size)
+        return CrawlerDataListResponse(
+            success=True,
+            data=data,
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+    except Exception as e:
+        print(f"❌ 获取爬虫数据失败: {e}")
+        return CrawlerDataListResponse(
+            success=False,
+            message=f"Error fetching data: {str(e)}",
+            data=[],
+            total=0,
+            page=page,
+            page_size=page_size
+        )
+
+# 直接添加crawl路由
+@app.post("/api/crawler/crawl")
+async def start_crawl(request: dict, background_tasks):
+    """直接处理crawl请求"""
+    from app.services.crawler_service import CrawlerService
+    
+    print(f"🐛 直接处理crawl请求 - pages: {request.get('pages', 1)}")
+    
+    try:
+        service = CrawlerService()
+        pages = request.get('pages', 1)
+        background_tasks.add_task(service.crawl_pages, 1, pages)
+        
+        return {
+            "success": True, 
+            "message": f"Started crawling {pages} pages in background."
+        }
+    except Exception as e:
+        print(f"❌ 启动爬虫失败: {e}")
+        return {
+            "success": False, 
+            "message": f"Failed to start crawl: {str(e)}"
+        }
+
+
+
 # 注册路由
-app.include_router(health.router, prefix="/api", tags=["health"])
-app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
-app.include_router(reports.router, tags=["reports"])
-app.include_router(screening.router, prefix="/api/screening", tags=["screening"])
-app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
-app.include_router(favorites.router, prefix="/api", tags=["favorites"])
-app.include_router(stocks_router.router, prefix="/api", tags=["stocks"])
-app.include_router(multi_market_stocks_router.router, prefix="/api", tags=["multi-market"])
-app.include_router(stock_data_router.router, tags=["stock-data"])
-app.include_router(stock_sync_router.router, tags=["stock-sync"])
-app.include_router(tags.router, prefix="/api", tags=["tags"])
-app.include_router(config.router, prefix="/api", tags=["config"])
-app.include_router(model_capabilities.router, tags=["model-capabilities"])
-app.include_router(usage_statistics.router, tags=["usage-statistics"])
-app.include_router(database.router, prefix="/api/system", tags=["database"])
-app.include_router(cache.router, tags=["cache"])
-app.include_router(operation_logs.router, prefix="/api/system", tags=["operation_logs"])
-app.include_router(logs.router, prefix="/api/system", tags=["logs"])
+app.include_router(health_router, prefix="/api", tags=["health"])
+app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
+app.include_router(analysis_router, prefix="/api/analysis", tags=["analysis"])
+app.include_router(reports_router, tags=["reports"])
+app.include_router(screening_router, prefix="/api/screening", tags=["screening"])
+app.include_router(queue_router, prefix="/api/queue", tags=["queue"])
+app.include_router(favorites_router, prefix="/api", tags=["favorites"])
+app.include_router(stocks_router, prefix="/api", tags=["stocks"])
+app.include_router(multi_market_stocks_router, prefix="/api", tags=["multi-market"])
+app.include_router(stock_data_router, tags=["stock-data"])
+app.include_router(stock_sync_router, tags=["stock-sync"])
+app.include_router(tags_router, prefix="/api", tags=["tags"])
+app.include_router(config_router, prefix="/api", tags=["config"])
+app.include_router(model_capabilities_router, tags=["model-capabilities"])
+app.include_router(usage_statistics_router, tags=["usage-statistics"])
+app.include_router(database_router, prefix="/api/system", tags=["database"])
+app.include_router(cache_router, tags=["cache"])
+app.include_router(operation_logs_router, prefix="/api/system", tags=["operation_logs"])
+app.include_router(logs_router, prefix="/api/system", tags=["logs"])
+
 # 新增：系统配置只读摘要
-from app.routers import system_config as system_config_router
-app.include_router(system_config_router.router, prefix="/api/system", tags=["system"])
+app.include_router(system_config_router, prefix="/api/system", tags=["system"])
 
 # 通知模块（REST + SSE）
-app.include_router(notifications_router.router, prefix="/api", tags=["notifications"])
+app.include_router(notifications_router, prefix="/api", tags=["notifications"])
 
 # 🔥 WebSocket 通知模块（替代 SSE + Redis PubSub）
-app.include_router(websocket_notifications_router.router, prefix="/api", tags=["websocket"])
+app.include_router(websocket_notifications_router, prefix="/api", tags=["websocket"])
 
 # 定时任务管理
-app.include_router(scheduler_router.router, tags=["scheduler"])
+app.include_router(scheduler_router, tags=["scheduler"])
 
-app.include_router(sse.router, prefix="/api/stream", tags=["streaming"])
-app.include_router(sync_router.router)
-app.include_router(multi_source_sync.router)
-app.include_router(paper_router.router, prefix="/api", tags=["paper"])
-app.include_router(tushare_init.router, prefix="/api", tags=["tushare-init"])
-app.include_router(akshare_init.router, prefix="/api", tags=["akshare-init"])
-app.include_router(baostock_init.router, prefix="/api", tags=["baostock-init"])
-app.include_router(historical_data.router, tags=["historical-data"])
-app.include_router(multi_period_sync.router, tags=["multi-period-sync"])
-app.include_router(financial_data.router, tags=["financial-data"])
-app.include_router(news_data.router, tags=["news-data"])
-app.include_router(social_media.router, tags=["social-media"])
-app.include_router(internal_messages.router, tags=["internal-messages"])
+app.include_router(sse_router, prefix="/api/stream", tags=["streaming"])
+app.include_router(sync_router)
+app.include_router(multi_source_sync_router)
+
+# 数据源初始化路由
+app.include_router(tushare_init_router, prefix="/api", tags=["tushare-init"])
+app.include_router(akshare_init_router, prefix="/api", tags=["akshare-init"])
+app.include_router(baostock_init_router, prefix="/api", tags=["baostock-init"])
+
+# 数据同步和分析路由
+app.include_router(historical_data_router, tags=["historical-data"])
+app.include_router(multi_period_sync_router, tags=["multi-period-sync"])
+app.include_router(financial_data_router, tags=["financial-data"])
+app.include_router(news_data_router, tags=["news-data"])
+app.include_router(social_media_router, tags=["social-media"])
+app.include_router(internal_messages_router, tags=["internal-messages"])
+
+# 爬虫路由
+app.include_router(crawler_router, prefix="/api", tags=["crawler"])
 
 
 @app.get("/")
