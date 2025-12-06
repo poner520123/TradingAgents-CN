@@ -10,7 +10,7 @@ db = db.getSiblingDB('admin');
 try {
   db.createUser({
     user: 'tradingagents',
-    pwd: 'tradingagents123',
+    pwd: 'tradingagents123456',
     roles: [
       {
         role: 'readWrite',

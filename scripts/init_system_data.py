@@ -10,15 +10,20 @@ from pathlib import Path
 from datetime import datetime
 import asyncio
 
+import hashlib
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from motor.motor_asyncio import AsyncIOMotorClient
-from app.core.database import get_mongo_db
-from app.models.user import User, UserRole
-from app.utils.security import get_password_hash
+from app.core.database import get_mongo_db, init_db
+from app.models.user import User
+# from app.utils.security import get_password_hash (Removed)
 from app.utils.timezone import now_tz
+
+def get_password_hash(password: str) -> str:
+    """密码哈希"""
+    return hashlib.sha256(password.encode()).hexdigest()
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -41,9 +46,9 @@ async def create_default_users(db):
     admin_user = {
         "username": "admin",
         "email": "admin@tradingagents.cn",
-        "hashed_password": get_password_hash("admin123"),
+        "hashed_password": get_password_hash("admin123456"),
         "full_name": "系统管理员",
-        "role": UserRole.ADMIN.value,
+
         "is_active": True,
         "is_superuser": True,
         "created_at": now_tz(),
@@ -58,7 +63,7 @@ async def create_default_users(db):
     await users_collection.insert_one(admin_user)
     logger.info("✓ 创建管理员用户成功")
     logger.info("  用户名: admin")
-    logger.info("  密码: admin123")
+    logger.info("  密码: admin123456")
     logger.info("  ⚠️  请在首次登录后立即修改密码！")
     
     # 创建默认测试用户
@@ -67,7 +72,7 @@ async def create_default_users(db):
         "email": "test@tradingagents.cn",
         "hashed_password": get_password_hash("test123"),
         "full_name": "测试用户",
-        "role": UserRole.USER.value,
+
         "is_active": True,
         "is_superuser": False,
         "created_at": now_tz(),
@@ -304,20 +309,23 @@ async def main():
     logger.info("=" * 60)
     
     try:
+        # 初始化数据库连接
+        await init_db()
+        
         # 获取数据库连接
         db = get_mongo_db()
         
         # 创建默认用户
-        await create_default_users(db.client[db.database_name])
+        await create_default_users(db)
         
         # 创建系统配置
-        await create_system_config(db.client[db.database_name])
+        await create_system_config(db)
         
         # 创建模型配置
-        await create_model_config(db.client[db.database_name])
+        await create_model_config(db)
         
         # 创建同步状态
-        await create_sync_status(db.client[db.database_name])
+        await create_sync_status(db)
         
         logger.info("\n" + "=" * 60)
         logger.info("✅ 系统初始化完成！")
@@ -326,7 +334,7 @@ async def main():
         logger.info("1. 启动后端服务: python -m uvicorn app.main:app --reload")
         logger.info("2. 启动前端服务: cd frontend && npm run dev")
         logger.info("3. 访问应用: http://localhost:5173")
-        logger.info("4. 使用管理员账号登录: admin / admin123")
+        logger.info("4. 使用管理员账号登录: admin / admin123456")
         logger.info("\n⚠️  重要: 请在首次登录后立即修改管理员密码！")
         
     except Exception as e:
