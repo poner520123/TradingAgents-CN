@@ -41,6 +41,14 @@
         <div class="stock-time">
           {{ formatTime(stock.crawled_at || stock.time) }}
         </div>
+        
+        <!-- 悬浮添加按钮 -->
+        <div class="hover-add-btn" @click.stop="addToFavorites(stock)">
+          <el-button type="primary" size="small" circle>
+            <el-icon><Plus /></el-icon>
+          </el-button>
+          <span class="add-text">加自选</span>
+        </div>
       </div>
     </div>
   </el-card>
@@ -49,8 +57,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Plus } from '@element-plus/icons-vue'
 import { getCrawlerData, type CrawlerData } from '@/api/crawler'
+import { favoritesApi } from '@/api/favorites'
+import { ElMessage } from 'element-plus'
 import { formatDateTime } from '@/utils/datetime'
 
 const router = useRouter()
@@ -138,6 +148,33 @@ const goToStockAnalysis = (stock: CrawlerData) => {
     }
   })
 }
+
+// 添加到自选股
+const addToFavorites = async (stock: CrawlerData) => {
+  if (!stock.stock_name) {
+    ElMessage.warning('股票名称无效')
+    return
+  }
+  
+  try {
+    const res = await favoritesApi.add({
+      stock_name: stock.stock_name,
+      symbol: stock.stock_code,
+      stock_code: stock.stock_code
+    })
+    ElMessage.success(res.message || '已添加到自选股')
+  } catch (error: any) {
+    console.error('Failed to add favorite:', error)
+    const msg = error.response?.data?.detail || error.message || '添加自选股失败'
+    if (msg.includes('duplicate') || msg.includes('exists')) {
+      ElMessage.warning('该股票已在自选股中')
+    } else {
+      ElMessage.error(msg)
+    }
+  }
+}
+
+// 设置自动刷新
 
 // 设置自动刷新
 const setupAutoRefresh = () => {
@@ -241,6 +278,31 @@ onUnmounted(() => {
     .stock-time {
       font-size: 11px;
       color: var(--el-text-color-placeholder);
+    }
+
+    .hover-add-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 2px 6px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+      .add-text {
+        font-size: 12px;
+        color: var(--el-color-primary);
+        font-weight: 500;
+      }
+    }
+
+    &:hover .hover-add-btn {
+      opacity: 1;
     }
   }
 }

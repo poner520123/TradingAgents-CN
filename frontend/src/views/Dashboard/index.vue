@@ -1,27 +1,6 @@
 <template>
   <div class="dashboard">
-    <!-- 欢迎区域 -->
-    <div class="welcome-section">
-      <div class="welcome-content">
-        <h1 class="welcome-title">
-          欢迎使用 TradingAgents-CN
-          <span class="version-badge">v1.0.0-preview</span>
-        </h1>
-        <p class="welcome-subtitle">
-          现代化的多智能体股票分析学习平台，辅助你掌握更全面的市场视角分析股票
-        </p>
-      </div>
-      <div class="welcome-actions">
-        <el-button type="primary" size="large" @click="quickAnalysis">
-          <el-icon><TrendCharts /></el-icon>
-          快速分析
-        </el-button>
-        <el-button size="large" @click="goToScreening">
-          <el-icon><Search /></el-icon>
-          股票筛选
-        </el-button>
-      </div>
-    </div>
+
 
 
     <!-- 学习中心推荐卡片 -->
@@ -31,7 +10,7 @@
           <el-icon size="48"><Reading /></el-icon>
         </div>
         <div class="learning-content">
-          <h2>📚 AI股票分析学习中心</h2>
+          <h2>📚 AI股票分析</h2>
           <p>从零开始学习AI、大语言模型和智能股票分析。了解多智能体系统如何协作分析股票，掌握提示词工程技巧，选择合适的大模型，理解AI的能力与局限性。</p>
           <div class="learning-features">
             <span class="feature-tag">🤖 AI基础知识</span>
@@ -42,8 +21,16 @@
             <span class="feature-tag">🎓 实战教程</span>
           </div>
         </div>
-        <div class="learning-action">
-          <el-button type="primary" size="large" @click="goToLearning">
+        <div class="learning-action" style="display: flex; flex-direction: column; gap: 10px;">
+          <el-button type="primary" size="large" @click="quickAnalysis">
+            <el-icon><TrendCharts /></el-icon>
+            快速分析
+          </el-button>
+          <el-button type="success" size="large" @click="goToScreening">
+            <el-icon><Search /></el-icon>
+            股票筛选
+          </el-button>
+          <el-button size="large" @click="goToLearning">
             <el-icon><Reading /></el-icon>
             开始学习
           </el-button>
