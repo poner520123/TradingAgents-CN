@@ -44,10 +44,7 @@
       <template #title>我的自选股</template>
     </el-menu-item>
 
-    <el-menu-item index="/paper">
-      <el-icon><CreditCard /></el-icon>
-      <template #title>模拟交易</template>
-    </el-menu-item>
+    
 
 
     <!-- 分析报告已移至“股票分析”子菜单，保留注释便于追踪 -->

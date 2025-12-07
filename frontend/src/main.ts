@@ -77,6 +77,31 @@ app.config.warnHandler = (msg, vm, trace) => {
   console.warn('全局警告:', msg, trace)
 }
 
+// 初始化股票名称代码映射表
+const initStockNameMap = async () => {
+  try {
+    // 检查是否需要更新映射表
+    const { shouldUpdateStockMaps, updateStockMaps } = await import('./utils/stockNameMap')
+    
+    if (shouldUpdateStockMaps()) {
+      console.log('🔄 初始化股票名称代码映射表...')
+      const { getAllAStocks } = await import('./api/multiMarket')
+      
+      const response = await getAllAStocks(20000) // 获取20000条A股数据
+      if (response.success && response.data?.stocks) {
+        updateStockMaps(response.data.stocks)
+      } else {
+        console.warn('⚠️ 获取股票列表失败，无法更新映射表')
+      }
+    } else {
+      console.log('✅ 股票映射表无需更新')
+    }
+  } catch (error) {
+    console.error('⚠️ 初始化股票名称代码映射表失败:', error)
+    // 映射表初始化失败不影响应用启动
+  }
+}
+
 // 初始化认证状态
 const initApp = async () => {
   try {
@@ -134,6 +159,9 @@ const initApp = async () => {
     // 无论认证状态如何，都挂载应用
     app.mount('#app')
     console.log('🚀 应用已挂载')
+    
+    // 异步初始化股票名称代码映射表（应用挂载后执行，不阻塞启动）
+    initStockNameMap()
   }
 }
 

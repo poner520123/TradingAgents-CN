@@ -118,3 +118,14 @@ export function getStockDailyQuotes(
   })
 }
 
+/**
+ * 获取所有A股股票列表
+ */
+export function getAllAStocks(limit: number = 10000) {
+  return request<{ stocks: StockInfo[]; total: number }>({
+    url: `/api/markets/CN/stocks/search`,
+    method: 'get',
+    params: { q: '', limit }
+  })
+}
+

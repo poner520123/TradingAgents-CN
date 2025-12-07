@@ -66,19 +66,11 @@
                         placeholder="选择市场"
                         size="large"
                         style="width: 100%"
-                        @change="onMarketChange"
+                        disabled
                       >
                         <el-option label="🇨🇳 A股市场" value="A股">
                           <span>🇨🇳 A股市场</span>
                           <span style="color: #909399; font-size: 12px; margin-left: 8px;">（6位数字）</span>
-                        </el-option>
-                        <el-option label="🇺🇸 美股市场" value="美股">
-                          <span>🇺🇸 美股市场</span>
-                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5个字母）</span>
-                        </el-option>
-                        <el-option label="🇭🇰 港股市场" value="港股">
-                          <span>🇭🇰 港股市场</span>
-                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5位数字）</span>
                         </el-option>
                       </el-select>
                     </el-form-item>
@@ -717,6 +709,7 @@ import { marked } from 'marked'
 import { recommendModels, validateModels, type ModelRecommendationResponse } from '@/api/modelCapabilities'
 import { validateStockCode, getStockCodeFormatHelp, getStockCodeExamples } from '@/utils/stockValidator'
 import { normalizeMarketForAnalysis, getMarketByStockCode } from '@/utils/market'
+import { getStockNameByCode } from '@/utils/stockNameMap'
 
 // 配置marked选项
 marked.setOptions({
@@ -725,7 +718,7 @@ marked.setOptions({
 })
 
 // 市场类型定义
-type MarketType = 'A股' | '美股' | '港股'
+type MarketType = 'A股'
 
 // 表单类型定义
 interface AnalysisForm {
@@ -839,17 +832,6 @@ const onStockCodeInput = () => {
   stockCodeHelp.value = getStockCodeFormatHelp(analysisForm.market)
 }
 
-// 市场类型变更时的处理
-const onMarketChange = () => {
-  // 重新验证股票代码
-  if (analysisForm.stockCode.trim()) {
-    validateStockCodeInput()
-  } else {
-    // 显示新市场的格式提示
-    stockCodeHelp.value = getStockCodeFormatHelp(analysisForm.market)
-  }
-}
-
 // 验证股票代码输入
 const validateStockCodeInput = () => {
   const code = analysisForm.stockCode.trim()
@@ -868,17 +850,18 @@ const validateStockCodeInput = () => {
     stockCodeHelp.value = ''
   } else {
     stockCodeError.value = ''
-    // stockCodeHelp.value = '✓'
-
-    // 自动更新市场类型（如果识别出的市场与当前选择不同）
-    if (validation.market && validation.market !== analysisForm.market) {
-      analysisForm.market = validation.market
-      ElMessage.success(`已自动识别为${validation.market}`)
-    }
 
     // 标准化代码
     if (validation.normalizedCode) {
       analysisForm.stockCode = validation.normalizedCode
+    }
+    
+    // 从localStorage获取股票名称
+    const stockName = getStockNameByCode(analysisForm.stockCode)
+    if (stockName && stockName !== analysisForm.stockCode) {
+      stockCodeHelp.value = `✓ ${stockName}`
+    } else {
+      stockCodeHelp.value = '✓'
     }
   }
 
