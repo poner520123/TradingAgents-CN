@@ -54,4 +54,32 @@ async def supplement_stock_mappings():
 async def resync_stock_mappings():
     """清空映射并重新同步"""
     result = stock_map_service.resync_mappings()
+    # 重新同步后重建缓存
+    stock_map_service._rebuild_cache()
     return result
+
+@router.get("/stock-map/name")
+async def get_stock_name_by_code(
+    code: str = Query(..., description="股票代码")
+):
+    """根据股票代码获取股票名称"""
+    name = stock_map_service.get_name_by_code(code)
+    from fastapi.responses import JSONResponse
+    if name:
+        return JSONResponse(
+            content={
+                "success": True,
+                "data": name,
+                "message": "获取成功"
+            },
+            media_type="application/json; charset=utf-8"
+        )
+    else:
+        return JSONResponse(
+            content={
+                "success": False,
+                "data": "",
+                "message": "未找到对应股票名称"
+            },
+            media_type="application/json; charset=utf-8"
+        )

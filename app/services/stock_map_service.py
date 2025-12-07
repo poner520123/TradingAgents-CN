@@ -18,8 +18,39 @@ class StockMapService:
         self.client = MongoClient(settings.MONGO_URI)
         self.db = self.client[settings.MONGO_DB]
         self.collection = self.db["stock_name_code_mapping"]
-        # 创建唯一索引
+        # 创建唯一索引（仅对name字段，code字段可能存在重复）
         self.collection.create_index([("name", 1)], unique=True)
+        self.collection.create_index([("code", 1)])  # 非唯一索引，用于加速查询
+        
+        # 初始化内存缓存
+        self.name_to_code: Dict[str, str] = {}  # 名称到代码的映射
+        self.code_to_name: Dict[str, str] = {}  # 代码到名称的映射
+        
+        # 从数据库加载所有映射到缓存
+        self._rebuild_cache()
+    
+    def _rebuild_cache(self):
+        """从数据库重建内存缓存"""
+        logger.info("开始从数据库重建内存缓存")
+        
+        # 清空现有缓存
+        self.name_to_code.clear()
+        self.code_to_name.clear()
+        
+        # 从数据库获取所有映射
+        maps = self.collection.find()
+        count = 0
+        
+        for map_item in maps:
+            name = map_item.get("name")
+            code = map_item.get("code")
+            
+            if name and code:
+                self.name_to_code[name] = code
+                self.code_to_name[code] = name
+                count += 1
+        
+        logger.info(f"内存缓存重建完成，共加载 {count} 条映射")
         
     def load_from_csv(self, csv_path: str) -> int:
         """从CSV文件加载股票名称到代码的映射"""
@@ -76,10 +107,19 @@ class StockMapService:
     def get_code_by_name(self, name: str) -> Optional[str]:
         """根据股票名称获取股票代码"""
         logger.info(f"根据股票名称获取股票代码: {name}")
-        # 先从数据库查询
+        # 先从缓存查询
+        if name in self.name_to_code:
+            logger.info(f"从缓存获取股票代码: {name} -> {self.name_to_code[name]}")
+            return self.name_to_code[name]
+        
+        # 如果缓存中没有，从数据库查询
         map_data = self.collection.find_one({"name": name})
         if map_data:
-            return map_data["code"]
+            code = map_data["code"]
+            # 更新缓存
+            self.name_to_code[name] = code
+            self.code_to_name[code] = name
+            return code
         
         # 如果数据库中没有，通过API查询
         logger.info(f"数据库中未找到股票代码，通过API查询: {name}")
@@ -148,6 +188,11 @@ class StockMapService:
                 },
                 upsert=True
             )
+            
+            # 更新缓存
+            self.name_to_code[name] = code
+            self.code_to_name[code] = name
+            logger.info(f"更新缓存: {name} -> {code}")
             return True
         except Exception as e:
             logger.error(f"更新或插入股票名称到代码的映射失败: {e}")
@@ -158,7 +203,32 @@ class StockMapService:
         logger.info(f"获取所有股票名称到代码的映射，跳过 {skip}，限制 {limit}")
         
         maps = self.collection.find().skip(skip).limit(limit)
-        return list(maps)
+        result = []
+        for map_item in maps:
+            # 转换ObjectId为字符串，确保可序列化
+            if "_id" in map_item:
+                map_item["_id"] = str(map_item["_id"])
+            result.append(map_item)
+        return result
+    
+    def get_name_by_code(self, code: str) -> Optional[str]:
+        """根据股票代码获取股票名称"""
+        logger.info(f"根据股票代码获取股票名称: {code}")
+        # 先从缓存查询
+        if code in self.code_to_name:
+            logger.info(f"从缓存获取股票名称: {code} -> {self.code_to_name[code]}")
+            return self.code_to_name[code]
+        
+        # 如果缓存中没有，从数据库查询
+        map_data = self.collection.find_one({"code": code})
+        if map_data:
+            name = map_data["name"]
+            # 更新缓存
+            self.code_to_name[code] = name
+            self.name_to_code[name] = code
+            return name
+        
+        return None
     
     def get_total_count(self) -> int:
         """获取股票名称到代码的映射总数"""

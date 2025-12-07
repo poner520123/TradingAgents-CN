@@ -868,7 +868,7 @@ const validateStockCodeInput = () => {
     stockCodeHelp.value = ''
   } else {
     stockCodeError.value = ''
-    stockCodeHelp.value = `✓ ${validation.market}代码格式正确`
+    // stockCodeHelp.value = '✓'
 
     // 自动更新市场类型（如果识别出的市场与当前选择不同）
     if (validation.market && validation.market !== analysisForm.market) {
@@ -887,8 +887,29 @@ const validateStockCodeInput = () => {
 }
 
 // 获取股票信息
-const fetchStockInfo = () => {
-  // TODO: 实现股票信息获取
+const fetchStockInfo = async () => {
+  const code = analysisForm.stockCode.trim()
+  if (!code || stockCodeError.value) return
+
+  try {
+    // 调用股票映射服务获取股票名称
+    const response = await fetch(`/api/stock-map/name?code=${encodeURIComponent(code)}`)
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success && data.data) {
+        // 找到股票名称，显示在提示中
+        stockCodeHelp.value = `✓ ${data.data}`
+        return
+      }
+    }
+    
+    // 如果API调用失败或未找到股票名称，保留原来的格式正确提示
+    console.log('未找到股票名称或API调用失败，保留格式正确提示')
+  } catch (error) {
+    // 如果API调用失败，保留原来的格式正确提示
+    console.error('获取股票信息失败:', error)
+    // 不覆盖现有的成功提示
+  }
 }
 
 // 切换分析师
