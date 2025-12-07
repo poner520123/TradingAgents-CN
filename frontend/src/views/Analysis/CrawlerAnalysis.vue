@@ -7,11 +7,30 @@
             <span class="title">爬虫分析</span>
             <el-tag type="info" class="ml-2">178448.com</el-tag>
           </div>
-          <div class="header-right">
-            <el-input-number v-model="crawlPages" :min="1" :max="10" size="default" class="mr-2" />
-            <el-button type="primary" :loading="crawling" @click="handleStartCrawl">
-              {{ crawling ? '爬取中...' : '开始爬取' }}
-            </el-button>
+          <div class="header-right" style="display: flex; align-items: center; gap: 10px;">
+            <el-input-number v-model="crawlPages" :min="1" :max="20" size="default" style="width: 120px;" />
+            <div class="crawl-controls" style="display: flex; align-items: center; gap: 10px;">
+              <el-switch 
+                v-model="autoCrawlEnabled" 
+                @change="handleAutoCrawlToggle" 
+              />
+              <span>定时爬取</span>
+              <el-select v-model="autoCrawlInterval" placeholder="选择间隔" size="small" @change="handleIntervalChange" style="width: 120px;">
+                <el-option label="3分钟" :value="3" />
+                <el-option label="5分钟" :value="5" />
+                <el-option label="10分钟" :value="10" />
+                <el-option label="30分钟" :value="30" />
+                <el-option label="1小时" :value="60" />
+              </el-select>
+              <el-button 
+                type="danger" 
+                size="small" 
+                @click="handleStopCrawl" 
+                :disabled="!crawling && !autoCrawlEnabled"
+              >
+                关闭爬虫
+              </el-button>
+            </div>
           </div>
         </div>
       </template>
@@ -83,12 +102,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { DataAnalysis } from '@element-plus/icons-vue'
 import { getCrawlerData, startCrawl, type CrawlerData } from '@/api/crawler'
-import { getStockCodeByName, loadStockNameCodeMap } from '@/utils/stockNameCodeMap'
+import { getStockCodeByName, loadStockNameCodeMap, getStockCodesByNames } from '@/utils/stockNameCodeMap'
+import { useNotificationStore } from '@/stores/notifications'
 
 const router = useRouter()
 const loading = ref(false)
@@ -97,12 +117,46 @@ const tableData = ref<CrawlerData[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const crawlPages = ref(1)
+const crawlPages = ref(5)
+
+// WebSocket连接引用
+let ws: WebSocket | null = null
+
+// 自动爬取相关
+const autoCrawlEnabled = ref(false)
+const autoCrawlInterval = ref(5) // 分钟
+let crawlTimer: number | null = null
 
 // 页面加载时初始化股票名称到代码的映射
 onMounted(async () => {
   await loadStockNameCodeMap()
   await fetchData()
+  
+  // 添加WebSocket消息监听
+  const token = localStorage.getItem('auth-token') || ''
+  if (token) {
+    ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/ws/notifications?token=${token}`)
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        if (message.type === 'notification' && message.data?.type === 'crawler') {
+          console.log('[CrawlerAnalysis] 收到爬虫完成通知，自动刷新数据')
+          fetchData()
+        }
+      } catch (error) {
+        console.error('[CrawlerAnalysis] 解析WebSocket消息失败:', error)
+      }
+    }
+    
+    ws.onerror = (error) => {
+      console.error('[CrawlerAnalysis] WebSocket连接错误:', error)
+    }
+    
+    ws.onclose = () => {
+      console.log('[CrawlerAnalysis] WebSocket连接关闭')
+    }
+  }
 })
 
 const fetchData = async () => {
@@ -112,7 +166,7 @@ const fetchData = async () => {
     if (res.success) {
       tableData.value = res.data
       total.value = res.total
-      // 为每个股票获取股票代码
+      // 为没有股票代码的股票获取代码
       await fetchStockCodes()
     }
   } catch (error) {
@@ -124,18 +178,38 @@ const fetchData = async () => {
 }
 
 const fetchStockCodes = async () => {
-  // 遍历所有股票数据，为没有股票代码的股票获取代码
-  for (const item of tableData.value) {
-    if (!item.stock_code) {
-      try {
-        // 从本地映射中获取股票代码
-        const code = await getStockCodeByName(item.stock_name)
-        if (code) {
-          item.stock_code = code
-        }
-      } catch (error) {
-        console.error(`Failed to get stock code for ${item.stock_name}:`, error)
+  // 收集所有没有股票代码的股票名称
+  const missingCodes = tableData.value.filter(item => !item.stock_code).map(item => item.stock_name)
+  
+  if (missingCodes.length === 0) {
+    return
+  }
+  
+  try {
+    // 使用批量请求获取所有缺失的股票代码
+    const codeMap = await getStockCodesByNames(missingCodes)
+    
+    // 更新表格数据
+    tableData.value.forEach(item => {
+      if (!item.stock_code && codeMap[item.stock_name]) {
+        item.stock_code = codeMap[item.stock_name]
       }
+    })
+  } catch (error) {
+    console.error('Failed to fetch stock codes in batch:', error)
+    // 如果批量请求失败，尝试使用本地映射
+    try {
+      // 等待本地映射加载完成
+      const localMap = await loadStockNameCodeMap()
+      
+      // 使用本地映射更新股票代码
+      tableData.value.forEach(item => {
+        if (!item.stock_code && localMap[item.stock_name]) {
+          item.stock_code = localMap[item.stock_name]
+        }
+      })
+    } catch (localError) {
+      console.error('Failed to use local stock code map:', localError)
     }
   }
 }
@@ -146,19 +220,76 @@ const handleStartCrawl = async () => {
     const res = await startCrawl(crawlPages.value)
     if (res.success) {
       ElMessage.success(`开始爬取前 ${crawlPages.value} 页数据，请稍后刷新查看`)
-      // Refresh after a short delay to see initial results
+      // 由于实际爬取在后台进行，我们需要保持爬取状态一段时间
       setTimeout(() => {
         fetchData()
       }, 2000)
+      // 30秒后重置状态，模拟实际爬取时间
+      setTimeout(() => {
+        if (crawling.value) {
+          crawling.value = false
+        }
+      }, 30000)
     } else {
       ElMessage.error(res.message || '启动爬取失败')
+      crawling.value = false
     }
   } catch (error) {
     console.error('Failed to start crawl:', error)
     ElMessage.error('启动爬取失败')
-  } finally {
     crawling.value = false
   }
+}
+
+// 自动爬取开关切换
+const handleAutoCrawlToggle = () => {
+  if (autoCrawlEnabled.value) {
+    startAutoCrawl()
+    ElMessage.success(`已开启自动爬取，每 ${autoCrawlInterval.value} 分钟执行一次`)
+  } else {
+    stopAutoCrawl()
+    ElMessage.info('已关闭自动爬取')
+  }
+}
+
+// 自动爬取间隔改变
+const handleIntervalChange = () => {
+  if (autoCrawlEnabled.value) {
+    stopAutoCrawl()
+    startAutoCrawl()
+    ElMessage.success(`自动爬取间隔已更新为 ${autoCrawlInterval.value} 分钟`)
+  }
+}
+
+// 启动自动爬取
+const startAutoCrawl = () => {
+  stopAutoCrawl() // 先停止已有的定时器
+  const intervalMs = autoCrawlInterval.value * 60 * 1000
+  crawlTimer = window.setInterval(() => {
+    handleStartCrawl()
+  }, intervalMs)
+}
+
+// 停止自动爬取
+const stopAutoCrawl = () => {
+  if (crawlTimer) {
+    clearInterval(crawlTimer)
+    crawlTimer = null
+  }
+}
+
+// 关闭爬虫
+const handleStopCrawl = () => {
+  // 停止当前爬取状态
+  crawling.value = false
+  
+  // 停止自动爬取
+  if (autoCrawlEnabled.value) {
+    autoCrawlEnabled.value = false
+    stopAutoCrawl()
+  }
+  
+  ElMessage.success('爬虫已关闭')
 }
 
 const analyzeStock = (row: CrawlerData) => {
@@ -201,8 +332,24 @@ const handleCurrentChange = (val: number) => {
   fetchData()
 }
 
-onMounted(() => {
-  fetchData()
+// 组件卸载时清理资源
+onUnmounted(() => {
+  // 清理定时器
+  if (crawlTimer) {
+    clearInterval(crawlTimer)
+    crawlTimer = null
+  }
+  
+  // 关闭WebSocket连接
+  if (ws) {
+    try {
+      ws.close()
+      console.log('[CrawlerAnalysis] WebSocket连接已关闭')
+    } catch (error) {
+      console.error('[CrawlerAnalysis] 关闭WebSocket连接失败:', error)
+    }
+    ws = null
+  }
 })
 </script>
 

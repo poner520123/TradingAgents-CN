@@ -51,5 +51,5 @@ class CrawlerDataListResponse(BaseModel):
     message: str = ""
 
 class StartCrawlRequest(BaseModel):
-    pages: int = 1
+    pages: int = 5
     force: bool = False

@@ -138,29 +138,63 @@ class StockMapService:
         logger.info(f"根据股票名称列表批量获取股票代码: {names}")
         result = {}
         
-        # 查询数据库
-        maps = self.collection.find({"name": {"$in": names}})
+        # 1. 优先使用内存缓存
+        cached_names = []
+        missing_names = []
+        
+        for name in names:
+            if name in self.name_to_code:
+                result[name] = self.name_to_code[name]
+                cached_names.append(name)
+            else:
+                missing_names.append(name)
+        
+        if cached_names:
+            logger.info(f"从内存缓存获取到 {len(cached_names)} 个股票代码")
+        
+        if not missing_names:
+            return result
+        
+        # 2. 批量查询数据库
+        maps = self.collection.find({"name": {"$in": missing_names}})
+        db_found = []
         for map_data in maps:
             result[map_data["name"]] = map_data["code"]
+            # 更新内存缓存
+            self.name_to_code[map_data["name"]] = map_data["code"]
+            self.code_to_name[map_data["code"]] = map_data["name"]
+            db_found.append(map_data["name"])
         
-        # 找出数据库中没有的股票名称
-        missing_names = [name for name in names if name not in result]
-        if missing_names:
-            logger.info(f"数据库中缺少 {len(missing_names)} 个股票代码，通过API查询")
-            
-            # 逐个通过API查询，确保单个失败不影响整体
-            for name in missing_names:
-                try:
-                    code = self._get_stock_code_from_api(name)
-                    if code:
-                        # 将查询结果保存到数据库
-                        market = self._get_market_by_code(code)
-                        self.upsert_map(name, code, market)
-                        result[name] = code
-                        logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到数据库")
-                except Exception as e:
-                    logger.error(f"查询股票代码失败: {name}，错误: {e}")
-                    # 继续处理其他股票名称，不中断整个流程
+        if db_found:
+            logger.info(f"从数据库获取到 {len(db_found)} 个股票代码")
+        
+        # 3. 找出数据库中也没有的股票名称
+        api_names = [name for name in missing_names if name not in db_found]
+        if not api_names:
+            return result
+        
+        # 4. 只对少量缺失的股票进行API查询，避免大量耗时请求
+        max_api_queries = 10  # 限制最大API查询数量
+        api_query_names = api_names[:max_api_queries]
+        logger.info(f"数据库中缺少 {len(api_names)} 个股票代码，将对前 {len(api_query_names)} 个进行API查询")
+        
+        for name in api_query_names:
+            try:
+                code = self._get_stock_code_from_api(name)
+                if code:
+                    # 将查询结果保存到数据库和缓存
+                    market = self._get_market_by_code(code)
+                    self.upsert_map(name, code, market)
+                    result[name] = code
+                    logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到数据库")
+            except Exception as e:
+                logger.error(f"查询股票代码失败: {name}，错误: {e}")
+                # 继续处理其他股票名称，不中断整个流程
+        
+        # 记录未找到的股票名称
+        not_found_names = [name for name in api_names if name not in result]
+        if not_found_names:
+            logger.info(f"未找到 {len(not_found_names)} 个股票代码: {not_found_names}")
         
         return result
     
@@ -352,47 +386,9 @@ class StockMapService:
             logger.info(f"使用手动映射: {name} -> {manual_mappings[name]}")
             return manual_mappings[name]
         
-        # 2. 尝试使用百度搜索
-        try:
-            import urllib.parse
-            import re
-            from bs4 import BeautifulSoup
-            
-            # 构建百度搜索URL
-            search_keyword = f"{name} 股票代码"
-            encoded_keyword = urllib.parse.quote(search_keyword)
-            url = f"https://www.baidu.com/s?wd={encoded_keyword}"
-            
-            logger.info(f"使用百度搜索: {url}")
-            
-            # 发送HTTP请求
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            }
-            response = requests.get(url, headers=headers, timeout=5, verify=False)
-            response.raise_for_status()
-            
-            # 解析HTML
-            soup = BeautifulSoup(response.text, "html.parser")
-            
-            # 提取搜索结果
-            results = soup.find_all("div", class_="result")
-            
-            # 正则表达式匹配股票代码，格式为6位数字
-            stock_code_pattern = re.compile(r"(\d{6})")
-            
-            # 遍历结果，查找股票代码
-            for result in results:
-                text = result.get_text()
-                match = stock_code_pattern.search(text)
-                if match:
-                    stock_code = match.group(1)
-                    logger.info(f"通过百度搜索找到股票代码: {name} -> {stock_code}")
-                    return stock_code
-        except Exception as e:
-            logger.error(f"百度搜索失败: {e}")
-        
-        logger.warning(f"无法查询到股票代码: {name}")
+        # 2. 百度搜索可能很慢，暂时禁用，优先使用本地缓存和手动映射
+        # 如果确实需要，可以考虑使用更快的API或服务
+        logger.warning(f"手动映射中未找到股票代码: {name}，百度搜索已禁用")
         return None
     
     def supplement_stock_mappings(self) -> Dict[str, int]:

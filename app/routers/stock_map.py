@@ -12,9 +12,17 @@ async def get_stock_code_by_name(
     """根据股票名称获取股票代码"""
     code = stock_map_service.get_code_by_name(name)
     if code:
-        return StockCodeResponse(code=code, found=True)
+        return StockCodeResponse(
+            success=True,
+            data={"code": code, "found": True},
+            message="获取成功"
+        )
     else:
-        return StockCodeResponse(code="", found=False)
+        return StockCodeResponse(
+            success=False,
+            data={"code": "", "found": False},
+            message="未找到对应股票代码"
+        )
 
 @router.post("/stock-map/codes/batch", response_model=Dict[str, str])
 async def get_stock_codes_by_names(
