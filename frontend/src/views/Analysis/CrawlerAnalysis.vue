@@ -71,16 +71,15 @@
         <el-table-column prop="reason" label="伏击理由" min-width="200" show-overflow-tooltip />
         <el-table-column prop="time" label="发布时间" width="160" sortable />
         <el-table-column prop="price" label="伏击价" width="100" />
-        <el-table-column prop="increase" label="涨幅" width="100">
-           <template #default="scope">
-            <span :class="getIncreaseClass(scope.row.increase)">{{ scope.row.increase }}</span>
-          </template>
-        </el-table-column>
+
         
         <el-table-column label="AI分析" width="120" fixed="right">
           <template #default="scope">
             <el-button size="small" type="primary" plain @click="analyzeStock(scope.row)">
               <el-icon><DataAnalysis /></el-icon>
+            </el-button>
+            <el-button size="small" type="success" plain @click="addToFavorites(scope.row)" title="加入自选">
+              <el-icon><Plus /></el-icon>
             </el-button>
           </template>
         </el-table-column>
@@ -105,8 +104,9 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { DataAnalysis } from '@element-plus/icons-vue'
+import { DataAnalysis, Plus } from '@element-plus/icons-vue'
 import { getCrawlerData, startCrawl, type CrawlerData } from '@/api/crawler'
+import { favoritesApi } from '@/api/favorites'
 import { getStockCodeByName, loadStockNameCodeMap, getStockCodesByNames } from '@/utils/stockNameCodeMap'
 import { useNotificationStore } from '@/stores/notifications'
 
@@ -301,6 +301,32 @@ const analyzeStock = (row: CrawlerData) => {
   })
 }
 
+const addToFavorites = async (row: CrawlerData) => {
+  if (!row.stock_name) {
+    ElMessage.warning('股票名称无效')
+    return
+  }
+
+  try {
+    const res = await favoritesApi.add({
+      stock_name: row.stock_name,
+      symbol: row.stock_code,
+      stock_code: row.stock_code // 兼容字段
+    })
+    
+    ElMessage.success(res.message || '已添加到自选股')
+  } catch (error: any) {
+    console.error('Failed to add favorite:', error)
+    // 如果是重复添加，通常API会返回特定错误，这里简单处理
+    const msg = error.response?.data?.detail || error.message || '添加自选股失败'
+    if (msg.includes('duplicate') || msg.includes('exists')) {
+      ElMessage.warning('该股票已在自选股中')
+    } else {
+      ElMessage.error(msg)
+    }
+  }
+}
+
 const parseConcepts = (conceptsStr: string) => {
   if (!conceptsStr) return []
   return conceptsStr.split(',').filter(c => c && c.trim())
@@ -315,12 +341,7 @@ const getSuccessRateType = (rate: string) => {
   return 'info'
 }
 
-const getIncreaseClass = (increase: string) => {
-  if (!increase) return ''
-  if (increase.includes('+') || parseFloat(increase) > 0) return 'text-red-500 font-bold'
-  if (increase.includes('-') || parseFloat(increase) < 0) return 'text-green-500 font-bold'
-  return ''
-}
+
 
 const handleSizeChange = (val: number) => {
   pageSize.value = val

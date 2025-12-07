@@ -115,15 +115,14 @@
                 <h4 class="section-title">👥 分析师团队</h4>
                 <div class="analysts-grid">
                   <div
-                    v-for="analyst in ANALYSTS"
-                    :key="analyst.id"
-                    class="analyst-card"
-                    :class="{ 
-                      active: analysisForm.selectedAnalysts.includes(analyst.name),
-                      disabled: analyst.name === '社媒分析师' && analysisForm.market === 'A股'
-                    }"
-                    @click="toggleAnalyst(analyst.name)"
-                  >
+                      v-for="analyst in ANALYSTS"
+                      :key="analyst.id"
+                      class="analyst-card"
+                      :class="{ 
+                        active: analysisForm.selectedAnalysts.includes(analyst.name)
+                      }"
+                      @click="toggleAnalyst(analyst.name)"
+                    >
                     <div class="analyst-avatar">
                       <el-icon>
                         <component :is="analyst.icon" />
@@ -140,15 +139,6 @@
                     </div>
                   </div>
                 </div>
-                
-                <!-- A股提示 -->
-                <el-alert
-                  v-if="analysisForm.market === 'A股'"
-                  title="A股市场暂不支持社媒分析（国内数据源限制）"
-                  type="info"
-                  :closable="false"
-                  style="margin-top: 12px"
-                />
               </div>
 
 
@@ -897,10 +887,6 @@ const fetchStockInfo = async () => {
 
 // 切换分析师
 const toggleAnalyst = (analystName: string) => {
-  if (analystName === '社媒分析师' && analysisForm.market === 'A股') {
-    return
-  }
-
   const index = analysisForm.selectedAnalysts.indexOf(analystName)
   if (index > -1) {
     analysisForm.selectedAnalysts.splice(index, 1)
