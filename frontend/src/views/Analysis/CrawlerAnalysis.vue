@@ -58,10 +58,10 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="AI分析" width="120" fixed="right">
           <template #default="scope">
             <el-button size="small" type="primary" plain @click="analyzeStock(scope.row)">
-              <el-icon class="mr-1"><DataAnalysis /></el-icon>智能分析
+              <el-icon><DataAnalysis /></el-icon>
             </el-button>
           </template>
         </el-table-column>

@@ -1,0 +1,22 @@
+# 股票名称代码映射配置文件
+# 
+# 配置说明：
+# - reinitialize: 是否需要重新初始化股票名称代码映射数据
+#   - true: 每次容器启动时都会重新初始化
+#   - false: 仅在首次启动时初始化
+# - update_historical_data: 是否需要更新历史爬虫数据中的股票代码
+#   - true: 每次初始化时都会更新历史数据
+#   - false: 仅在首次初始化时更新历史数据
+# - csv_path: namecode.csv文件路径
+# - batch_size: 批量处理历史数据时的批次大小
+
+stock_mapping:
+  reinitialize: false
+  update_historical_data: true
+  csv_path: "newstock/data/namecode.csv"
+  batch_size: 100
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

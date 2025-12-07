@@ -221,79 +221,6 @@
           </div>
         </el-card>
 
-        <!-- 模拟交易账户 -->
-        <el-card class="paper-trading-card" style="margin-top: 24px;">
-          <template #header>
-            <div class="card-header">
-              <span>模拟交易账户</span>
-              <el-button type="text" size="small" @click="goToPaperTrading">
-                查看详情 <el-icon><ArrowRight /></el-icon>
-              </el-button>
-            </div>
-          </template>
-
-          <div v-if="paperAccount" class="paper-account-info">
-            <!-- A股账户 -->
-            <div class="account-section">
-              <div class="account-section-title">🇨🇳 A股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">¥{{ formatMoney(paperAccount.cash?.CNY || paperAccount.cash) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">¥{{ formatMoney(paperAccount.positions_value?.CNY || paperAccount.positions_value) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">¥{{ formatMoney(paperAccount.equity?.CNY || paperAccount.equity) }}</div>
-              </div>
-            </div>
-
-            <!-- 港股账户 -->
-            <div class="account-section" v-if="paperAccount.cash?.HKD !== undefined">
-              <div class="account-section-title">🇭🇰 港股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">HK${{ formatMoney(paperAccount.cash.HKD) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">HK${{ formatMoney(paperAccount.positions_value?.HKD || 0) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">HK${{ formatMoney(paperAccount.equity?.HKD || 0) }}</div>
-              </div>
-            </div>
-
-            <!-- 美股账户 -->
-            <div class="account-section" v-if="paperAccount.cash?.USD !== undefined">
-              <div class="account-section-title">🇺🇸 美股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">${{ formatMoney(paperAccount.cash.USD) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">${{ formatMoney(paperAccount.positions_value?.USD || 0) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">${{ formatMoney(paperAccount.equity?.USD || 0) }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="empty-state">
-            <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无账户信息</p>
-            <el-button type="primary" size="small" @click="goToPaperTrading">
-              查看模拟交易
-            </el-button>
-          </div>
-        </el-card>
-
         <!-- 多数据源同步 -->
         <MultiSourceSyncCard style="margin-top: 24px;" />
       </el-col>
@@ -321,6 +248,7 @@ import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
 import { analysisApi } from '@/api/analysis'
 import { newsApi } from '@/api/news'
+import RandomStocksCard from '@/components/Dashboard/RandomStocksCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -921,87 +849,6 @@ onMounted(async () => {
       padding-top: 12px;
       border-top: 1px solid var(--el-border-color-lighter);
       margin-top: 12px;
-    }
-  }
-
-  .paper-trading-card {
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .paper-account-info {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-
-      .account-section {
-        border: 1px solid var(--el-border-color-lighter);
-        border-radius: 8px;
-        padding: 12px;
-        background-color: var(--el-fill-color-blank);
-
-        .account-section-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--el-text-color-primary);
-          margin-bottom: 12px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid var(--el-border-color-lighter);
-        }
-      }
-
-      .account-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-
-        .account-label {
-          font-size: 13px;
-          color: var(--el-text-color-regular);
-        }
-
-        .account-value {
-          font-size: 15px;
-          font-weight: 600;
-          color: var(--el-text-color-primary);
-
-          &.primary {
-            color: var(--el-color-primary);
-            font-size: 16px;
-          }
-
-          &.price-up {
-            color: #f56c6c;
-          }
-
-          &.price-down {
-            color: #67c23a;
-          }
-
-          &.price-neutral {
-            color: var(--el-text-color-regular);
-          }
-        }
-      }
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 20px 0;
-
-      .empty-icon {
-        font-size: 48px;
-        color: var(--el-text-color-placeholder);
-        margin-bottom: 12px;
-      }
-
-      p {
-        color: var(--el-text-color-secondary);
-        margin-bottom: 16px;
-      }
     }
   }
 }
