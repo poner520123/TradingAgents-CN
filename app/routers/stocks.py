@@ -18,6 +18,65 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
 
+@router.get("/search", response_model=dict)
+async def search_stocks(
+    q: str = Query("", description="搜索关键词（代码或名称）"),
+    limit: int = Query(20, ge=1, le=20000, description="返回结果数量"),
+    market: str = Query("CN", description="市场类型 (CN/HK/US)"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    搜索股票（支持多市场）
+    
+    Args:
+        q: 搜索关键词
+        limit: 返回结果数量
+        market: 市场类型 (CN/HK/US)，默认CN
+    
+    Returns:
+        {
+            "success": true,
+            "data": {
+                "stocks": [
+                    {
+                        "code": "00700",
+                        "name": "腾讯控股",
+                        "name_en": "Tencent Holdings",
+                        "market": "HK",
+                        "source": "yfinance",
+                        ...
+                    }
+                ],
+                "total": 1
+            }
+        }
+    """
+    from app.services.unified_stock_service import UnifiedStockService
+    
+    market = market.upper()
+    if market not in ["CN", "HK", "US"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的市场类型: {market}"
+        )
+    
+    db = get_mongo_db()
+    service = UnifiedStockService(db)
+    
+    try:
+        results = await service.search_stocks(market, q, limit)
+        return ok(data={
+            "stocks": results,
+            "total": len(results)
+        })
+    except Exception as e:
+        logger.error(f"❌ 搜索股票失败: market={market}, q={q}, error={e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"搜索失败: {str(e)}"
+        )
+
+
 def _zfill_code(code: str) -> str:
     try:
         s = str(code).strip()

@@ -271,6 +271,38 @@ async def lifespan(app: FastAPI):
         logger.info("✅ 默认管理员用户已创建或已存在")
     except Exception as e:
         logger.error(f"❌ 创建管理员用户失败: {e}")
+    
+    # 初始化股票名称代码映射
+    try:
+        from app.services.stock_map_service import stock_map_service
+        # 检查当前映射数量
+        current_count = stock_map_service.get_total_count()
+        logger.info(f"📊 当前股票映射数量: {current_count} 条")
+        
+        # 每次启动都重新加载映射，确保数据最新
+        csv_path = "docs/fjzt_a.csv"
+        from pathlib import Path
+        if Path(csv_path).exists():
+            logger.info("📝 开始重新加载股票名称代码映射")
+            # 先清空现有映射，确保数据完全一致
+            clear_result = stock_map_service.clear_mappings()
+            if clear_result:
+                logger.info("✅ 已清空现有股票映射")
+                # 从CSV文件加载最新映射
+                loaded_count = stock_map_service.load_from_csv(csv_path)
+                logger.info(f"✅ 从CSV文件加载了 {loaded_count} 条股票映射")
+            else:
+                logger.warning("⚠️  清空现有映射失败，使用增量加载")
+                loaded_count = stock_map_service.load_from_csv(csv_path)
+                logger.info(f"✅ 从CSV文件增量加载了 {loaded_count} 条股票映射")
+        else:
+            logger.warning(f"⚠️  CSV文件不存在: {csv_path}")
+            
+        # 显示最终映射数量
+        final_count = stock_map_service.get_total_count()
+        logger.info(f"✅ 股票映射初始化完成，共 {final_count} 条")
+    except Exception as e:
+        logger.error(f"❌ 初始化股票映射失败: {e}", exc_info=True)
 
     #  配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
     try:

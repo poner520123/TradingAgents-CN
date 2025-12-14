@@ -137,9 +137,9 @@
             <el-form-item label="侧边栏宽度">
               <el-slider
                 v-model="appearanceSettings.sidebarWidth"
-                :min="200"
+                :min="100"
                 :max="400"
-                :step="20"
+                :step="10"
                 show-input
               />
             </el-form-item>

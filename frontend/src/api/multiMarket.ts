@@ -70,9 +70,9 @@ export function getSupportedMarkets() {
  */
 export function searchStocks(market: string, query: string, limit: number = 20) {
   return request<{ stocks: StockInfo[]; total: number }>({
-    url: `/api/markets/${market}/stocks/search`,
+    url: `/api/stocks/search`,
     method: 'get',
-    params: { q: query, limit }
+    params: { q: query, limit, market }
   })
 }
 
@@ -81,7 +81,7 @@ export function searchStocks(market: string, query: string, limit: number = 20) 
  */
 export function getStockInfo(market: string, code: string, source?: string) {
   return request<StockInfo>({
-    url: `/api/markets/${market}/stocks/${code}/info`,
+    url: `/api/stocks/${code}/fundamentals`,
     method: 'get',
     params: source ? { source } : undefined
   })
@@ -92,7 +92,7 @@ export function getStockInfo(market: string, code: string, source?: string) {
  */
 export function getStockQuote(market: string, code: string) {
   return request<StockQuote>({
-    url: `/api/markets/${market}/stocks/${code}/quote`,
+    url: `/api/stocks/${code}/quote`,
     method: 'get'
   })
 }
@@ -108,12 +108,11 @@ export function getStockDailyQuotes(
   limit: number = 100
 ) {
   return request<{ code: string; market: string; quotes: DailyQuote[]; total: number }>({
-    url: `/api/markets/${market}/stocks/${code}/daily`,
+    url: `/api/stocks/${code}/kline`,
     method: 'get',
     params: {
-      start_date: startDate,
-      end_date: endDate,
-      limit
+      limit,
+      // 注意：后端kline端点使用period参数，默认day，不支持start_date和end_date
     }
   })
 }
@@ -123,9 +122,9 @@ export function getStockDailyQuotes(
  */
 export function getAllAStocks(limit: number = 10000) {
   return request<{ stocks: StockInfo[]; total: number }>({
-    url: `/api/markets/CN/stocks/search`,
+    url: `/api/stocks/search`,
     method: 'get',
-    params: { q: '', limit }
+    params: { q: '', limit, market: 'CN' }
   })
 }
 

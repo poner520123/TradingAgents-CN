@@ -3,41 +3,6 @@
 
 
 
-    <!-- 学习中心推荐卡片 -->
-    <el-card class="learning-highlight-card">
-      <div class="learning-highlight">
-        <div class="learning-icon">
-          <el-icon size="48"><Reading /></el-icon>
-        </div>
-        <div class="learning-content">
-          <h2>📚 AI股票分析</h2>
-          <p>从零开始学习AI、大语言模型和智能股票分析。了解多智能体系统如何协作分析股票，掌握提示词工程技巧，选择合适的大模型，理解AI的能力与局限性。</p>
-          <div class="learning-features">
-            <span class="feature-tag">🤖 AI基础知识</span>
-            <span class="feature-tag">✍️ 提示词工程</span>
-            <span class="feature-tag">🎯 模型选择</span>
-            <span class="feature-tag">📊 分析原理</span>
-            <span class="feature-tag">⚠️ 风险认知</span>
-            <span class="feature-tag">🎓 实战教程</span>
-          </div>
-        </div>
-        <div class="learning-action" style="display: flex; flex-direction: column; gap: 10px;">
-          <el-button type="primary" size="large" @click="quickAnalysis">
-            <el-icon><TrendCharts /></el-icon>
-            快速分析
-          </el-button>
-          <el-button type="success" size="large" @click="goToScreening">
-            <el-icon><Search /></el-icon>
-            股票筛选
-          </el-button>
-          <el-button size="large" @click="goToLearning">
-            <el-icon><Reading /></el-icon>
-            开始学习
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
     <!-- 随机股票推荐卡片 -->
     <RandomStocksCard />
 
@@ -133,28 +98,6 @@
             </el-button>
           </div>
         </el-card>
-
-        <!-- 市场快讯 -->
-        <el-card class="market-news-card" style="margin-top: 24px;">
-          <template #header>
-            <span>市场快讯</span>
-          </template>
-          <div v-if="marketNews.length > 0" class="news-list">
-            <div
-              v-for="news in marketNews"
-              :key="news.id"
-              class="news-item"
-              @click="openNewsUrl(news.url)"
-            >
-              <div class="news-title">{{ news.title }}</div>
-              <div class="news-time">{{ formatTime(news.time) }}</div>
-            </div>
-          </div>
-          <div v-else class="empty-state">
-            <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无市场快讯</p>
-          </div>
-        </el-card>
       </el-col>
 
       <!-- 右侧：自选股和快讯 -->
@@ -234,7 +177,6 @@ import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
 import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
 import { analysisApi } from '@/api/analysis'
-import { newsApi } from '@/api/news'
 import RandomStocksCard from '@/components/Dashboard/RandomStocksCard.vue'
 
 const router = useRouter()
@@ -266,10 +208,6 @@ const recentAnalyses = ref<AnalysisTask[]>([])
 
 // 自选股数据
 const favoriteStocks = ref<any[]>([])
-
-// 市场快讯数据
-const marketNews = ref<any[]>([])
-const syncingNews = ref(false)
 
 
 
@@ -347,13 +285,7 @@ const downloadReport = async (analysis: AnalysisTask) => {
   }
 }
 
-const openNewsUrl = (url?: string) => {
-  if (url) {
-    window.open(url, '_blank')
-  } else {
-    ElMessage.info('该新闻暂无详情链接')
-  }
-}
+
 
 const getStatusType = (status: string | AnalysisStatus): 'success' | 'info' | 'warning' | 'danger' => {
   const statusMap: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
@@ -440,84 +372,37 @@ const loadRecentAnalyses = async () => {
   }
 }
 
-const loadMarketNews = async () => {
-  try {
-    // 先尝试获取最近 24 小时的新闻
-    let response = await newsApi.getLatestNews(undefined, 10, 24)
-
-    // 如果最近 24 小时没有新闻，则获取最新的 10 条（不限时间）
-    if (response.success && response.data && response.data.news.length === 0) {
-      console.log('最近 24 小时没有新闻，获取最新的 10 条新闻（不限时间）')
-      response = await newsApi.getLatestNews(undefined, 10, 24 * 365) // 回溯 1 年
-    }
-
-    if (response.success && response.data) {
-      marketNews.value = response.data.news.map((item: any) => ({
-        id: item.id || item.title,
-        title: item.title,
-        time: item.publish_time,
-        url: item.url,
-        source: item.source
-      }))
-    }
-  } catch (error) {
-    console.error('加载市场快讯失败:', error)
-    // 如果加载失败，显示提示信息
-    marketNews.value = []
-  }
-}
-
-
-
-const syncMarketNews = async () => {
-  try {
-    syncingNews.value = true
-    ElMessage.info('正在同步市场新闻，请稍候...')
-
-    // 调用同步API（后台任务）
-    const response = await newsApi.syncMarketNews(24, 50)
-
-    if (response.success) {
-      ElMessage.success('新闻同步任务已启动，请稍后刷新查看')
-
-      // 等待3秒后自动刷新新闻列表
-      setTimeout(async () => {
-        await loadMarketNews()
-        if (marketNews.value.length > 0) {
-          ElMessage.success(`成功加载 ${marketNews.value.length} 条市场新闻`)
-        }
-      }, 3000)
-    }
-  } catch (error) {
-    console.error('同步市场快讯失败:', error)
-    ElMessage.error('同步市场新闻失败，请稍后重试')
-  } finally {
-    syncingNews.value = false
-  }
-}
-
 // 生命周期
 onMounted(async () => {
   // 加载自选股数据
   await loadFavoriteStocks()
   // 加载最近分析
   await loadRecentAnalyses()
-  // 加载市场快讯
-  await loadMarketNews()
 })
 </script>
 
 <style lang="scss" scoped>
 .dashboard {
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+
   .welcome-section {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 40px;
     color: white;
     margin-bottom: 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.3);
+    }
 
     .welcome-content {
       .welcome-title {
@@ -551,105 +436,175 @@ onMounted(async () => {
   }
 
   .learning-highlight-card {
-    margin-bottom: 24px;
-    border: 2px solid var(--el-color-primary);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+      margin-bottom: 24px;
+      border: 2px solid var(--el-color-primary);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
 
-    .learning-highlight {
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      padding: 8px;
-
-      .learning-icon {
-        flex-shrink: 0;
-        width: 80px;
-        height: 80px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
+      &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.3);
       }
 
-      .learning-content {
-        flex: 1;
+      .learning-highlight {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 32px;
+        padding: 32px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
 
-        h2 {
-          font-size: 20px;
-          font-weight: 600;
-          margin: 0 0 12px 0;
-          color: var(--el-text-color-primary);
-        }
-
-        p {
-          font-size: 14px;
-          color: var(--el-text-color-regular);
-          line-height: 1.6;
-          margin: 0 0 16px 0;
-        }
-
-        .learning-features {
+        .learning-icon {
+          flex-shrink: 0;
+          width: 90px;
+          height: 90px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
 
-          .feature-tag {
-            padding: 4px 12px;
-            background: var(--el-color-primary-light-9);
-            color: var(--el-color-primary);
-            border-radius: 16px;
-            font-size: 13px;
-            font-weight: 500;
+        .learning-content {
+          flex: 1;
+
+          h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 0 16px 0;
+            color: var(--el-text-color-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+
+          p {
+            font-size: 15px;
+            color: var(--el-text-color-regular);
+            line-height: 1.7;
+            margin: 0 0 20px 0;
+          }
+
+          .learning-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+
+            .feature-tag {
+              padding: 6px 16px;
+              background: var(--el-color-primary-light-8);
+              color: var(--el-color-primary);
+              border-radius: 20px;
+              font-size: 13px;
+              font-weight: 500;
+              border: 1px solid var(--el-color-primary-light-7);
+            }
+          }
+        }
+
+        .learning-action {
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          width: 220px;
+
+          .action-button {
+            width: 100%;
+            height: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+            &:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
           }
         }
       }
-
-      .learning-action {
-        flex-shrink: 0;
-      }
     }
-  }
 
-  .quick-actions-card {
+  .quick-actions-card,
+  .recent-analyses-card,
+  .favorites-card {
+    margin-bottom: 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--el-border-color-lighter);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    background: white;
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      border-color: var(--el-color-primary-light-5);
+    }
+
+    &::v-deep .el-card__header {
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+      font-weight: 600;
+      font-size: 16px;
+      padding: 18px 24px;
+    }
+
     .quick-actions {
       display: grid;
       gap: 16px;
+      padding: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 
       .action-item {
         display: flex;
         align-items: center;
-        gap: 16px;
-        padding: 20px;
+        gap: 20px;
+        padding: 24px;
         border: 1px solid var(--el-border-color-lighter);
-        border-radius: 8px;
+        border-radius: 12px;
         cursor: pointer;
         transition: all 0.3s ease;
+        background: white;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(245, 247, 250, 0.8) 100%);
+        backdrop-filter: blur(10px);
 
         &:hover {
           border-color: var(--el-color-primary);
-          background-color: var(--el-color-primary-light-9);
+          background-color: var(--el-color-primary-light-8);
+          transform: translateY(-4px);
+          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
         }
 
         .action-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 8px;
-          background: var(--el-color-primary-light-8);
+          width: 50px;
+          height: 50px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: var(--el-color-primary);
-          font-size: 20px;
+          color: white;
+          font-size: 24px;
+          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
         }
 
         .action-content {
           flex: 1;
 
           h3 {
-            margin: 0 0 4px 0;
-            font-size: 16px;
+            margin: 0 0 6px 0;
+            font-size: 17px;
             font-weight: 600;
             color: var(--el-text-color-primary);
           }
@@ -658,25 +613,62 @@ onMounted(async () => {
             margin: 0;
             font-size: 14px;
             color: var(--el-text-color-regular);
+            line-height: 1.5;
           }
         }
 
         .action-arrow {
-          color: var(--el-text-color-placeholder);
+          color: var(--el-color-primary);
+          font-size: 18px;
           transition: transform 0.3s ease;
         }
 
         &:hover .action-arrow {
-          transform: translateX(4px);
+          transform: translateX(6px);
         }
       }
     }
   }
 
   .recent-analyses-card {
+    margin-bottom: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--el-border-color-lighter);
+    overflow: hidden;
+
+    &::v-deep .el-card__header {
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    &::v-deep .el-table {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    &::v-deep .el-table__header-wrapper th {
+      background: var(--el-color-primary-light-9);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    &::v-deep .el-table__body-wrapper {
+      border-radius: 8px;
+    }
+
     .table-footer {
       text-align: center;
       margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--el-border-color-lighter);
+
+      &::v-deep .el-button {
+        color: var(--el-color-primary);
+        font-weight: 500;
+      }
     }
   }
 
@@ -685,7 +677,7 @@ onMounted(async () => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 0;
+      padding: 12px 0;
 
       &:not(:last-child) {
         border-bottom: 1px solid var(--el-border-color-lighter);
@@ -693,42 +685,60 @@ onMounted(async () => {
 
       .status-label {
         color: var(--el-text-color-regular);
+        font-size: 14px;
       }
 
       .status-value {
         font-weight: 600;
         color: var(--el-text-color-primary);
+        font-size: 14px;
       }
     }
   }
 
   .market-news-card {
+    margin-bottom: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--el-border-color-lighter);
+    overflow: hidden;
+
+    &::v-deep .el-card__header {
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+      font-weight: 600;
+      font-size: 16px;
+    }
+
     .news-list {
       .news-item {
-        padding: 12px 0;
+        padding: 16px 0;
         cursor: pointer;
         border-bottom: 1px solid var(--el-border-color-lighter);
+        transition: all 0.3s ease;
 
         &:last-child {
           border-bottom: none;
         }
 
         &:hover {
-          background-color: var(--el-fill-color-lighter);
-          margin: 0 -16px;
-          padding: 12px 16px;
-          border-radius: 4px;
+          background-color: var(--el-color-primary-light-9);
+          margin: 0 -20px;
+          padding: 16px 20px;
+          border-radius: 8px;
+          transform: translateX(4px);
         }
 
         .news-title {
-          font-size: 14px;
+          font-size: 15px;
           color: var(--el-text-color-primary);
-          margin-bottom: 4px;
-          line-height: 1.4;
+          margin-bottom: 6px;
+          line-height: 1.5;
+          font-weight: 500;
         }
 
         .news-time {
-          font-size: 12px;
+          font-size: 13px;
           color: var(--el-text-color-placeholder);
         }
       }
@@ -737,6 +747,25 @@ onMounted(async () => {
     .news-footer {
       text-align: center;
       margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--el-border-color-lighter);
+
+      &::v-deep .el-button {
+        color: var(--el-color-primary);
+        font-weight: 500;
+      }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--el-text-color-placeholder);
+
+      .empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        color: var(--el-color-primary-light-6);
+      }
     }
   }
 
@@ -744,27 +773,46 @@ onMounted(async () => {
     .tip-item {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 0;
+      gap: 10px;
+      padding: 12px 0;
       font-size: 14px;
       color: var(--el-text-color-regular);
 
       .tip-icon {
         color: var(--el-color-primary);
+        font-size: 16px;
       }
     }
   }
 
   .favorites-card {
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--el-border-color-lighter);
+    overflow: hidden;
+
+    &::v-deep .el-card__header {
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+      font-weight: 600;
+      font-size: 16px;
+    }
+
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+
+      &::v-deep .el-button {
+        color: var(--el-color-primary);
+        font-weight: 500;
+        font-size: 14px;
+      }
     }
 
     .empty-favorites {
       text-align: center;
-      padding: 20px 0;
+      padding: 40px 0;
     }
 
     .favorites-list {
@@ -772,16 +820,18 @@ onMounted(async () => {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 0;
+        padding: 16px 0;
         border-bottom: 1px solid var(--el-border-color-lighter);
         cursor: pointer;
-        transition: background-color 0.3s ease;
+        transition: all 0.3s ease;
 
         &:hover {
-          background-color: var(--el-fill-color-lighter);
-          margin: 0 -16px;
-          padding: 12px 16px;
-          border-radius: 6px;
+          background-color: var(--el-color-primary-light-9);
+          margin: 0 -20px;
+          padding: 16px 20px;
+          border-radius: 8px;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
         }
 
         &:last-child {
@@ -789,31 +839,35 @@ onMounted(async () => {
         }
 
         .stock-info {
+          flex: 1;
+
           .stock-code {
             font-weight: 600;
-            font-size: 14px;
+            font-size: 15px;
             color: var(--el-text-color-primary);
+            margin-bottom: 4px;
           }
 
           .stock-name {
-            font-size: 12px;
+            font-size: 13px;
             color: var(--el-text-color-regular);
-            margin-top: 2px;
           }
         }
 
         .stock-price {
           text-align: right;
+          min-width: 120px;
 
           .current-price {
             font-weight: 600;
-            font-size: 14px;
+            font-size: 16px;
             color: var(--el-text-color-primary);
+            margin-bottom: 4px;
           }
 
           .change-percent {
-            font-size: 12px;
-            margin-top: 2px;
+            font-size: 14px;
+            font-weight: 500;
 
             &.price-up {
               color: #f56c6c;
@@ -833,9 +887,15 @@ onMounted(async () => {
 
     .favorites-footer {
       text-align: center;
-      padding-top: 12px;
+      padding: 16px 0;
       border-top: 1px solid var(--el-border-color-lighter);
-      margin-top: 12px;
+      margin-top: 8px;
+
+      &::v-deep .el-button {
+        color: var(--el-color-primary);
+        font-weight: 500;
+        font-size: 14px;
+      }
     }
   }
 }

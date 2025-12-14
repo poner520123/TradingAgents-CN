@@ -48,7 +48,7 @@ export const useAppStore = defineStore('app', {
     lastApiCheck: 0,
 
     sidebarCollapsed: useStorage('sidebar-collapsed', false).value || false,
-    sidebarWidth: useStorage('sidebar-width', 193).value || 193,
+    sidebarWidth: useStorage('sidebar-width', 135).value || 135,
 
     currentRoute: null,
 
@@ -165,7 +165,8 @@ export const useAppStore = defineStore('app', {
 
     // 设置侧边栏宽度
     setSidebarWidth(width: number) {
-      this.sidebarWidth = Math.max(200, Math.min(400, width))
+      // 调整最小值，允许更窄的侧边栏宽度
+      this.sidebarWidth = Math.max(100, Math.min(400, width))
       // 同步到 localStorage
       localStorage.setItem('sidebar-width', String(this.sidebarWidth))
     },

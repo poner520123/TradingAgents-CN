@@ -75,6 +75,7 @@ COPY config ./config
 COPY scripts/setup ./scripts/setup
 COPY scripts/user_password_manager.py ./scripts/
 COPY scripts/mongo-init.js ./scripts/
+COPY docs/fjzt_a.csv ./docs/
 
 # 复制Docker环境配置文件
 COPY .env.docker ./.env

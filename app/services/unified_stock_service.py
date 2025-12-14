@@ -185,8 +185,8 @@ class UnifiedStockService:
             ]
         }
 
-        # 查询所有匹配的记录
-        cursor = collection.find(filter_query)
+        # 查询所有匹配的记录，排除_id字段
+        cursor = collection.find(filter_query, {"_id": 0})
         all_results = await cursor.to_list(length=None)
         
         if not all_results:

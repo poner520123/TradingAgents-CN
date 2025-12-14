@@ -78,8 +78,8 @@ async def get_supported_markets(current_user: dict = Depends(get_current_user)):
 @router.get("/{market}/stocks/search", response_model=dict)
 async def search_stocks(
     market: str,
-    q: str = Query(..., description="搜索关键词（代码或名称）"),
-    limit: int = Query(20, ge=1, le=100, description="返回结果数量"),
+    q: str = Query("", description="搜索关键词（代码或名称）"),
+    limit: int = Query(20, ge=1, le=20000, description="返回结果数量"),
     current_user: dict = Depends(get_current_user)
 ):
     """

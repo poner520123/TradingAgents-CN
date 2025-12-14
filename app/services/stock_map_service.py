@@ -66,27 +66,20 @@ class StockMapService:
                         code = row[1].replace('"', '').strip()
                         
                         if name and code:
-                            # 检查是否已存在
-                            existing = self.collection.find_one({"name": name})
-                            if not existing:
-                                # 确定市场类型
-                                market = self._get_market_by_code(code)
-                                
-                                # 插入数据
-                                map_data = {
-                                    "name": name,
-                                    "code": code,
-                                    "market": market,
-                                    "updated_at": datetime.utcnow(),
-                                    "created_at": datetime.utcnow()
-                                }
-                                self.collection.insert_one(map_data)
+                            # 确定市场类型
+                            market = self._get_market_by_code(code)
+                            
+                            # 使用upsert_map方法，确保数据更新或插入
+                            success = self.upsert_map(name, code, market)
+                            if success:
                                 count += 1
         except Exception as e:
             logger.error(f"从CSV文件加载股票名称到代码的映射失败: {e}")
             return 0
         
-        logger.info(f"从CSV文件加载股票名称到代码的映射完成，共加载 {count} 条记录")
+        # 重新构建内存缓存
+        self._rebuild_cache()
+        logger.info(f"从CSV文件加载股票名称到代码的映射完成，共处理 {count} 条记录")
         return count
     
     def _get_market_by_code(self, code: str) -> str:
