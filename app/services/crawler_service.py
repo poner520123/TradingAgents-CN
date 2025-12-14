@@ -452,79 +452,175 @@ class CrawlerService:
         """Crawl pages with enhanced thread stability."""
         # Logic similar to original but with enhanced error handling
         total_saved = 0
+        from app.routers.websocket_notifications import send_notification_via_websocket
+        import asyncio
         
-        for page in range(start_page, end_page + 1):
-            try:
-                logger.info(f"HTML Crawling page {page}...")
-                html = self.fetch_page(page)
-                if html:
-                    try:
-                        data = self.parse_html(html)
-                        if data:
-                            try:
-                                saved = self.save_data(data)
-                                total_saved += saved
-                                logger.info(f"Page {page}: Saved {saved} new records")
-                                delay = get_random_delay("success")
-                            except Exception as e:
-                                logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
-                                delay = get_random_delay("failure")
-                        else:
-                            logger.warning(f"Page {page}: No data or parsing failed")
-                            delay = get_random_delay("failure")
-                    except Exception as e:
-                        logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
-                        delay = get_random_delay("failure")
-                    
-                    # Add random pause if needed
-                    if should_insert_random_pause():
-                        random_pause = get_random_pause()
-                        logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
-                        time.sleep(random_pause)
-                    
-                    # Add base delay
-                    logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
-                    time.sleep(delay)
-                else:
-                    logger.error(f"Page {page}: Failed to fetch")
-                    delay = get_random_delay("failure")
-                    time.sleep(delay)
-                    
-            except Exception as e:
-                logger.error(f"❌ Fatal error on page {page} - {type(e).__name__}: {str(e)}")
-                # Add longer delay on fatal errors
-                fatal_delay = random.uniform(10, 15)
-                logger.info(f"⚠️ Fatal error occurred, waiting {fatal_delay:.2f}s before continuing")
-                time.sleep(fatal_delay)
-                # Reset session to avoid persistent issues
-                self._reset_session()
-                continue
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        logger.info(f"✅ Crawl completed: Saved {total_saved} new records from pages {start_page}-{end_page}")
-        
-        # 通过 WebSocket 发送通知给前端，让前端刷新数据
         try:
-            from app.routers.websocket_notifications import send_notification_via_websocket
-            import asyncio
+            # 获取最近3个工作日的起始日期
+            start_date = self._get_recent_workdays(3)
+            # 记录已获取的日期范围
+            collected_dates = set()
+            # 初始爬取页面范围
+            current_end_page = end_page
+            # 标记是否已经覆盖了最近3个工作日
+            has_covered_recent_workdays = False
             
-            # 发送爬虫完成通知
-            notification = {
-                "id": f"crawler-{int(time.time())}",
-                "title": "爬虫完成",
-                "content": f"成功爬取 {total_saved} 条新数据",
-                "type": "crawler",
-                "link": "/analysis/crawler",
-                "source": "crawler",
-                "created_at": datetime.utcnow().isoformat(),
-                "status": "unread"
-            }
+            while not has_covered_recent_workdays:
+                logger.info(f"🔍 开始爬取页面 {start_page}-{current_end_page}，目标覆盖最近3个工作日")
+                
+                for page in range(start_page, current_end_page + 1):
+                    try:
+                        # 发送开始爬取某页的通知
+                        msg = f"正在爬取第 {page} 页..."
+                        logger.info(msg)
+                        loop.run_until_complete(send_notification_via_websocket("admin", {
+                            "id": f"crawler-p{page}-start-{int(time.time())}",
+                            "title": "爬虫进度",
+                            "content": msg,
+                            "type": "progress", # 新类型：progress
+                            "data": {
+                                "status": "crawling", 
+                                "page": page, 
+                                "total_pages": current_end_page - start_page + 1,
+                                "current_step": page - start_page + 1
+                            },
+                            "source": "crawler",
+                            "created_at": datetime.utcnow().isoformat()
+                        }))
+
+                        html = self.fetch_page(page)
+                        if html:
+                            try:
+                                data = self.parse_html(html)
+                                if data:
+                                    try:
+                                        saved = self.save_data(data)
+                                        total_saved += saved
+                                        msg = f"第 {page} 页: 成功保存 {saved} 条新数据"
+                                        logger.info(msg)
+                                        
+                                        # 发送保存成功通知
+                                        loop.run_until_complete(send_notification_via_websocket("admin", {
+                                            "id": f"crawler-p{page}-saved-{int(time.time())}",
+                                            "title": "爬虫进度",
+                                            "content": msg,
+                                            "type": "progress",
+                                            "data": {
+                                                "status": "saved", 
+                                                "page": page, 
+                                                "saved_count": saved
+                                            },
+                                            "source": "crawler",
+                                            "created_at": datetime.utcnow().isoformat()
+                                        }))
+                                        
+                                        # 收集已获取数据的日期
+                                        for item in data:
+                                            time_str = item['time']
+                                            try:
+                                                ts = time_str.strip()
+                                                if '-' in ts:
+                                                    fmt = '%Y-%m-%d %H:%M' if ':' in ts else '%Y-%m-%d'
+                                                elif '/' in ts:
+                                                    fmt = '%Y/%m/%d %H:%M' if ':' in ts else '%Y/%m/%d'
+                                                else:
+                                                    continue
+                                                row_date = datetime.strptime(ts, fmt)
+                                                # 只记录日期部分
+                                                collected_dates.add(row_date.date())
+                                            except ValueError:
+                                                continue
+                                        
+                                        delay = get_random_delay("success")
+                                    except Exception as e:
+                                        logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
+                                        delay = get_random_delay("failure")
+                                else:
+                                    logger.warning(f"Page {page}: No data or parsing failed")
+                                    delay = get_random_delay("failure")
+                            except Exception as e:
+                                logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
+                                delay = get_random_delay("failure")
+                            
+                            # Add random pause if needed
+                            if should_insert_random_pause():
+                                random_pause = get_random_pause()
+                                logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
+                                time.sleep(random_pause)
+                            
+                            # Add base delay
+                            logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
+                            time.sleep(delay)
+                        else:
+                            logger.error(f"Page {page}: Failed to fetch")
+                            delay = get_random_delay("failure")
+                            time.sleep(delay)
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Fatal error on page {page} - {type(e).__name__}: {str(e)}")
+                        # Add longer delay on fatal errors
+                        fatal_delay = random.uniform(10, 15)
+                        logger.info(f"⚠️ Fatal error occurred, waiting {fatal_delay:.2f}s before continuing")
+                        time.sleep(fatal_delay)
+                        # Reset session to avoid persistent issues
+                        self._reset_session()
+                        continue
+                
+                # 检查是否已经覆盖了最近3个工作日
+                # 生成最近3个工作日的日期集合
+                recent_workdays = set()
+                today = datetime.now().date()
+                workdays = 0
+                current_date = today
+                while workdays < 3:
+                    if current_date.weekday() < 5:  # 0-4 表示周一到周五
+                        recent_workdays.add(current_date)
+                        workdays += 1
+                    current_date -= timedelta(days=1)
+                
+                logger.info(f"📅 已收集的日期: {sorted(collected_dates)}")
+                logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
+                
+                # 检查是否已经覆盖了所有最近3个工作日
+                if recent_workdays.issubset(collected_dates):
+                    has_covered_recent_workdays = True
+                    logger.info("✅ 已成功覆盖最近3个工作日的数据")
+                else:
+                    # 如果没有覆盖，增加爬取页数，翻倍
+                    start_page = current_end_page + 1
+                    current_end_page *= 2
+                    logger.info(f"⚠️ 未覆盖所有最近3个工作日，继续爬取更多页面。新的爬取范围: {start_page}-{current_end_page}")
             
-            # 使用异步方式发送通知
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(send_notification_via_websocket("admin", notification))
+            logger.info(f"✅ Crawl completed: Saved {total_saved} new records from pages {start_page}-{current_end_page}")
             
-            logger.info("📤 WebSocket 通知发送成功")
-        except Exception as e:
-            logger.error(f"❌ 发送 WebSocket 通知失败: {type(e).__name__}: {str(e)}")
+            # 通过 WebSocket 发送通知给前端，让前端刷新数据
+            try:
+                from app.routers.websocket_notifications import send_notification_via_websocket
+                import asyncio
+                
+                # 发送爬虫完成通知
+                notification = {
+                    "id": f"crawler-{int(time.time())}",
+                    "title": "爬虫完成",
+                    "content": f"成功爬取 {total_saved} 条新数据",
+                    "type": "crawler",
+                    "link": "/analysis/crawler",
+                    "source": "crawler",
+                    "created_at": datetime.utcnow().isoformat(),
+                    "status": "unread"
+                }
+                
+                # 使用异步方式发送通知
+                # loop = asyncio.get_event_loop() # loop already exists
+                loop.run_until_complete(send_notification_via_websocket("admin", notification))
+                
+                logger.info("📤 WebSocket 通知发送成功")
+            except Exception as e:
+                logger.error(f"❌ 发送 WebSocket 通知失败: {type(e).__name__}: {str(e)}")
+        finally:
+            loop.close()
         
         return total_saved

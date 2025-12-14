@@ -1,6 +1,6 @@
 # 更新日志
 
-本文档记录了TradingAgents-CN项目的所有重要更改。
+本文档记录了TA项目的所有重要更改。
 
 ## [v1.0.0-preview] - 2025-10-XX - 多应用架构预览版 (FastAPI + Vite + Streamlit)
 

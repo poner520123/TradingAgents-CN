@@ -3677,7 +3677,7 @@ class ConfigService:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
                 "HTTP-Referer": "https://tradingagents.cn",  # OpenRouter要求
-                "X-Title": "TradingAgents-CN"
+                "X-Title": "TA"
             }
 
             data = {

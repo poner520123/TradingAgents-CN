@@ -1,8 +1,8 @@
-# TradingAgents-CN 许可证说明
+# TA 许可证说明
 
 ## 📋 许可证概述
 
-TradingAgents-CN 项目采用**混合许可证策略**，不同组件使用不同的许可证：
+TA 项目采用**混合许可证策略**，不同组件使用不同的许可证：
 
 ## 🔓 开源组件 (Apache License 2.0)
 
@@ -63,7 +63,7 @@ TradingAgents-CN 项目采用**混合许可证策略**，不同组件使用不�
 
 **联系方式**：
 - 📧 邮箱：hsliup@163.com
-- 🌐 GitHub：https://github.com/hsliuping/TradingAgents-CN
+- 🌐 GitHub：https://github.com/hsliuping/TA
 - � QQ群：782124367
 
 ### 商业许可包含：

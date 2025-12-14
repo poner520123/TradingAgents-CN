@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档详细说明如何保持 TradingAgents-CN 与原项目 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 的同步。
+本文档详细说明如何保持 TA 与原项目 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 的同步。
 
 ## 🎯 同步目标
 
@@ -272,4 +272,4 @@ git branch -d hotfix/urgent-fix
 - **变更说明**: 详细说明每次同步的内容
 - **用户通知**: 及时通知用户重要更新
 
-通过这套完整的同步策略，我们可以确保 TradingAgents-CN 始终保持与原项目的技术同步，同时维护我们独特的中文增强价值。
+通过这套完整的同步策略，我们可以确保 TA 始终保持与原项目的技术同步，同时维护我们独特的中文增强价值。

@@ -39,7 +39,7 @@ class RealtimeNewsAggregator:
 
     def __init__(self):
         self.headers = {
-            'User-Agent': 'TradingAgents-CN/1.0'
+            'User-Agent': 'TA/1.0'
         }
 
         # API密钥配置

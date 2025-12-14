@@ -65,8 +65,8 @@ TUSHARE_TOKEN=your_tushare_token      # Tushare数据
 ### 1. 克隆项目
 ```bash
 # 克隆中文增强版
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/hsliuping/TA.git
+cd TA
 ```
 
 ### 2. 创建虚拟环境

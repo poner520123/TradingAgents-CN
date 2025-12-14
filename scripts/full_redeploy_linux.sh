@@ -1,5 +1,5 @@
 #!/bin/bash
-# TradingAgents-CN 完整重新部署脚本（Linux服务器）
+# TA 完整重新部署脚本（Linux服务器）
 # 包含：代码更新 -> 镜像构建 -> 推送 -> 部署 -> 初始化
 
 set -e
@@ -25,7 +25,7 @@ VERSION=${2:-"v1.0.0-preview"}
 BRANCH=${3:-"v1.0.0-preview"}
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}TradingAgents-CN 完整重新部署${NC}"
+echo -e "${CYAN}TA 完整重新部署${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Docker Hub用户名: ${DOCKERHUB_USERNAME}${NC}"

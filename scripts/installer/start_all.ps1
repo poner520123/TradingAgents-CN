@@ -1,4 +1,4 @@
-# TradingAgents-CN Portable - Start All Services
+# TA Portable - Start All Services
 # This script starts MongoDB, Redis, Backend, and Nginx
 
 [CmdletBinding()]
@@ -33,7 +33,7 @@ $mongoPort = if ($envMap.ContainsKey('MONGODB_PORT')) { [int]$envMap['MONGODB_PO
 $redisPort = if ($envMap.ContainsKey('REDIS_PORT')) { [int]$envMap['REDIS_PORT'] } else { 6379 }
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "TradingAgents-CN Portable - Start All" -ForegroundColor Cyan
+Write-Host "TA Portable - Start All" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 

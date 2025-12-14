@@ -7,7 +7,7 @@ set -e
 UPSTREAM_REPO="https://github.com/TauricResearch/TradingAgents.git"
 FORK_REPO="https://github.com/hsliuping/TradingAgents.git"
 LOCAL_DIR="TradingAgents-Fork"
-TRADINGAGENTS_CN_DIR="../TradingAgentsCN"  # 假设TradingAgents-CN在上级目录
+TRADINGAGENTS_CN_DIR="../TradingAgentsCN"  # 假设TA在上级目录
 
 # 颜色输出
 GREEN='\033[0;32m'

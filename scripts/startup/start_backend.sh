@@ -1,8 +1,8 @@
 #!/bin/bash
-# TradingAgents-CN Backend Launcher for Linux/macOS
+# TA Backend Launcher for Linux/macOS
 # 快速启动脚本
 
-echo "🚀 TradingAgents-CN Backend Launcher"
+echo "🚀 TA Backend Launcher"
 echo "=================================================="
 
 # 检查Python是否安装

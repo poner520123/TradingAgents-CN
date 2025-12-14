@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-DeepSeek V3 是TradingAgents-CN v0.1.7新集成的成本优化AI模型，专为中文金融场景设计。相比GPT-4，DeepSeek V3在保持优秀分析质量的同时，成本降低90%以上，是进行股票分析的理想选择。
+DeepSeek V3 是TA v0.1.7新集成的成本优化AI模型，专为中文金融场景设计。相比GPT-4，DeepSeek V3在保持优秀分析质量的同时，成本降低90%以上，是进行股票分析的理想选择。
 
 ## 🎯 DeepSeek V3 特色
 
@@ -403,10 +403,10 @@ results = asyncio.run(batch_analysis(symbols))
 - 📚 [DeepSeek文档](https://platform.deepseek.com/docs)
 - 💬 [DeepSeek社区](https://github.com/deepseek-ai)
 
-### TradingAgents-CN支持
-- 🐛 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
-- 💬 [GitHub Discussions](https://github.com/hsliuping/TradingAgents-CN/discussions)
-- 📚 [完整文档](https://github.com/hsliuping/TradingAgents-CN/tree/main/docs)
+### TA支持
+- 🐛 [GitHub Issues](https://github.com/hsliuping/TA/issues)
+- 💬 [GitHub Discussions](https://github.com/hsliuping/TA/discussions)
+- 📚 [完整文档](https://github.com/hsliuping/TA/tree/main/docs)
 
 ---
 

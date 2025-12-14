@@ -1,10 +1,10 @@
 #!/bin/bash
-# Docker环境初始化脚本 - TradingAgents-CN v1.0.0-preview
+# Docker环境初始化脚本 - TA v1.0.0-preview
 
 set -e
 
 echo "=========================================="
-echo "TradingAgents-CN Docker 初始化"
+echo "TA Docker 初始化"
 echo "=========================================="
 
 # 颜色定义

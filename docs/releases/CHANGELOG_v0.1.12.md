@@ -1,4 +1,4 @@
-# TradingAgents-CN v0.1.12 更新日志
+# TA v0.1.12 更新日志
 
 ## 📅 版本信息
 
@@ -302,7 +302,7 @@ news_filter:
 
 如果您在使用过程中遇到任何问题或有改进建议，请通过以下方式联系我们：
 
-- **GitHub Issues**: [提交问题](https://github.com/hsliuping/TradingAgents-CN/issues)
+- **GitHub Issues**: [提交问题](https://github.com/hsliuping/TA/issues)
 - **邮箱**: hsliup@163.com
 - **QQ群**: 782124367
 
@@ -318,4 +318,4 @@ news_filter:
 
 ---
 
-**🌟 TradingAgents-CN v0.1.12 - 让AI新闻分析更智能！**
+**🌟 TA v0.1.12 - 让AI新闻分析更智能！**

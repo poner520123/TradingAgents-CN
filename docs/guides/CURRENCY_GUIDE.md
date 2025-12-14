@@ -3,9 +3,9 @@
 
 ## 📋 概述 / Overview
 
-TradingAgents-CN 支持多种货币单位的模型定价，不同的 LLM 厂家使用不同的货币进行计费。
+TA 支持多种货币单位的模型定价，不同的 LLM 厂家使用不同的货币进行计费。
 
-TradingAgents-CN supports multiple currency units for model pricing. Different LLM providers use different currencies for billing.
+TA supports multiple currency units for model pricing. Different LLM providers use different currencies for billing.
 
 ## 💱 货币单位规范 / Currency Standards
 
@@ -219,7 +219,7 @@ For currency-related questions, please contact:
 
 - 📧 邮箱 / Email: hsliup@163.com
 - 💬 QQ群 / QQ Group: 782124367
-- 🌐 GitHub: https://github.com/hsliuping/TradingAgents-CN
+- 🌐 GitHub: https://github.com/hsliuping/TA
 
 ---
 

@@ -1,4 +1,4 @@
-# TradingAgents-CN Docker 部署初始化脚本
+# TA Docker 部署初始化脚本
 # 用于新机器部署后的快速初始化
 
 param(
@@ -7,7 +7,7 @@ param(
     [switch]$CheckOnly
 )
 
-Write-Host "🚀 TradingAgents-CN Docker 部署初始化" -ForegroundColor Green
+Write-Host "🚀 TA Docker 部署初始化" -ForegroundColor Green
 Write-Host "=" * 60 -ForegroundColor Gray
 
 # 检查 Python 环境

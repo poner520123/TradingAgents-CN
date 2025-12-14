@@ -1,9 +1,9 @@
-# Docker环境初始化脚本 - TradingAgents-CN v1.0.0-preview (PowerShell)
+# Docker环境初始化脚本 - TA v1.0.0-preview (PowerShell)
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "TradingAgents-CN Docker 初始化" -ForegroundColor Cyan
+Write-Host "TA Docker 初始化" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 # 检查.env文件

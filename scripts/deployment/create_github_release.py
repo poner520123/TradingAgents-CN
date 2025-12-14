@@ -34,7 +34,7 @@ def create_release_notes():
     release_notes = """
 ## 🌐 Web管理界面和Google AI支持
 
-TradingAgents-CN v0.1.2 带来了重大更新，新增了完整的Web管理界面和Google AI模型支持！
+TA v0.1.2 带来了重大更新，新增了完整的Web管理界面和Google AI模型支持！
 
 ### ✨ 主要新功能
 
@@ -131,7 +131,7 @@ python cli/main.py --llm-provider google --model gemini-2.0-flash --stock TSLA
 
 def show_release_info():
     """显示发布信息"""
-    logger.info(f"🎉 TradingAgents-CN v0.1.2 已成功发布到GitHub！")
+    logger.info(f"🎉 TA v0.1.2 已成功发布到GitHub！")
     logger.info(f"=")
     
     logger.info(f"\n📋 发布内容:")
@@ -142,12 +142,12 @@ def show_release_info():
     logger.info(f"  📚 详细的使用文档")
     
     logger.info(f"\n🔗 GitHub链接:")
-    logger.info(f"  📦 Release: https://github.com/hsliuping/TradingAgents-CN/releases/tag/cn-v0.1.2")
-    logger.info(f"  📝 代码: https://github.com/hsliuping/TradingAgents-CN")
+    logger.info(f"  📦 Release: https://github.com/hsliuping/TA/releases/tag/cn-v0.1.2")
+    logger.info(f"  📝 代码: https://github.com/hsliuping/TA")
     
     logger.info(f"\n🚀 快速开始:")
-    logger.info(f"  1. git clone https://github.com/hsliuping/TradingAgents-CN.git")
-    logger.info(f"  2. cd TradingAgents-CN")
+    logger.info(f"  1. git clone https://github.com/hsliuping/TA.git")
+    logger.info(f"  2. cd TA")
     logger.info(f"  3. pip install -r requirements.txt")
     logger.info(f"  4. python -m streamlit run web/app.py")
     
@@ -201,9 +201,9 @@ def main():
     # 显示GitHub Release创建指南
     logger.info(f"\n📋 GitHub Release创建指南:")
     logger.info(f"=")
-    logger.info(f"1. 访问: https://github.com/hsliuping/TradingAgents-CN/releases/new")
+    logger.info(f"1. 访问: https://github.com/hsliuping/TA/releases/new")
     logger.info(f"2. 选择标签: cn-v0.1.2")
-    logger.info(f"3. 发布标题: TradingAgents-CN v0.1.2 - Web管理界面和Google AI支持")
+    logger.info(f"3. 发布标题: TA v0.1.2 - Web管理界面和Google AI支持")
     logger.info(f"4. 复制 RELEASE_NOTES_v0.1.2.md 的内容到描述框")
     logger.info(f"5. 勾选 'Set as the latest release'")
     logger.info(f"6. 点击 'Publish release'")

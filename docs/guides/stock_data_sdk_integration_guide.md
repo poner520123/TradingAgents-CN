@@ -46,7 +46,7 @@
 ### 目录结构说明
 
 ```
-TradingAgents-CN/
+TA/
 ├── app/                          # 后端服务 (FastAPI)
 │   ├── services/                 # 业务服务层
 │   │   └── stock_data_service.py # 数据访问服务

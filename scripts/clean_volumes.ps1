@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    清理 TradingAgents-CN Docker 数据卷
+    清理 TA Docker 数据卷
 
 .DESCRIPTION
     此脚本用于清理 MongoDB 和 Redis 数据卷，创建全新的数据卷

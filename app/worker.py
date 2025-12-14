@@ -1,5 +1,5 @@
 """
-TradingAgents-CN WebAPI Worker
+TA WebAPI Worker
 
 Consumes tasks from Redis queue and processes them using actual stock analysis.
 """

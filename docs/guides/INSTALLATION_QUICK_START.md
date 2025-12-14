@@ -1,6 +1,6 @@
-# TradingAgents-CN 快速安装指南
+# TA 快速安装指南
 
-> 5分钟快速上手 TradingAgents-CN v1.0.0-preview
+> 5分钟快速上手 TA v1.0.0-preview
 
 ## 🚀 三种部署方式，一键选择
 
@@ -23,14 +23,14 @@ powershell -ExecutionPolicy Bypass -File start_all.ps1
 
 📥 **下载地址**: 
 
-- 关注公众号 "TradingAgents-CN" 获取网盘链接
+- 关注公众号 "TA" 获取网盘链接
 
 操作手册：
 
 https://mp.weixin.qq.com/s/uAk4RevdJHMuMvlqpdGUEw
-TradingAgents-CN v1.0.0-preview绿色版（目前只支持windows）简单使用手册
+TA v1.0.0-preview绿色版（目前只支持windows）简单使用手册
 https://mp.weixin.qq.com/s/o5QdNuh2-iKkIHzJXCj7vQ
-TradingAgents-CN v1.0.0-preview绿色版绿色版端口配置说明
+TA v1.0.0-preview绿色版绿色版端口配置说明
 ---
 
 ### 方式二：Docker版（最稳定）⭐ 推荐生产环境
@@ -43,8 +43,8 @@ TradingAgents-CN v1.0.0-preview绿色版绿色版端口配置说明
 mkdir tradingagents-cn && cd tradingagents-cn
 
 # 3. 下载配置文件
-curl -O https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/main/.env.example
+curl -O https://raw.githubusercontent.com/hsliuping/TA/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/hsliuping/TA/main/.env.example
 mv .env.example .env
 
 # 4. 编辑 .env 文件，配置 API 密钥
@@ -74,8 +74,8 @@ docker-compose logs -f
 # 1. 安装依赖: Python 3.10+, MongoDB 4.4+, Redis 6.2+
 
 # 2. 克隆代码
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/hsliuping/TA.git
+cd TA
 
 # 3. 创建虚拟环境
 python -m venv env
@@ -213,15 +213,15 @@ FRONTEND_PORT=5174
 
 ### 视频教程
 
-关注微信公众号 **"TradingAgents-CN"** 获取：
+关注微信公众号 **"TA"** 获取：
 - 安装部署视频教程
 - 功能使用演示
 - 最佳实践分享
 
 ### 社区支持
 
-- **GitHub Issues**: [提交问题](https://github.com/hsliuping/TradingAgents-CN/issues)
-- **微信公众号**: TradingAgents-CN
+- **GitHub Issues**: [提交问题](https://github.com/hsliuping/TA/issues)
+- **微信公众号**: TA
 - **QQ 群**: 关注公众号获取群号
 
 ---

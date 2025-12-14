@@ -1,5 +1,5 @@
 <#
-TradingAgents-CN Windows Portable Stopper
+TA Windows Portable Stopper
 Stops MongoDB, Redis, backend, optional Nginx based on runtime\pids.json.
 Encoding-safe version: ASCII-only output.
 #>

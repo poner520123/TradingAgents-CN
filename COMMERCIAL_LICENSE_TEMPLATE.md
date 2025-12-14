@@ -1,19 +1,19 @@
-# TradingAgents-CN 商业许可证模板
-# TradingAgents-CN Commercial License Template
+# TA 商业许可证模板
+# TA Commercial License Template
 
 ## 商业软件许可协议
 ## Commercial Software License Agreement
 
 **许可方 / Licensor**: hsliuping
 **被许可方 / Licensee**: [客户公司名称 / Client Company Name]
-**软件 / Software**: TradingAgents-CN Web Application (app/ 和 frontend/ 目录)
+**软件 / Software**: TA Web Application (app/ 和 frontend/ 目录)
 **协议日期 / Agreement Date**: [日期 / Date]
 
 ---
 
 ## 第一条 许可范围
 
-1.1 **许可软件**: 本协议涵盖 TradingAgents-CN 项目中的以下组件：
+1.1 **许可软件**: 本协议涵盖 TA 项目中的以下组件：
 - FastAPI 后端应用 (`app/` 目录)
 - Vue.js 前端应用 (`frontend/` 目录)
 - 相关文档和配置文件
@@ -105,5 +105,5 @@
 
 **商业许可咨询 / Commercial License Inquiries**:
 - 邮箱 / Email: hsliup@163.com
-- GitHub: https://github.com/hsliuping/TradingAgents-CN
+- GitHub: https://github.com/hsliuping/TA
 - QQ群 / QQ Group: 782124367

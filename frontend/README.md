@@ -1,6 +1,6 @@
-# TradingAgents-CN 前端应用
+# TA 前端应用
 
-现代化的Vue3前端界面，为TradingAgents-CN提供优秀的用户体验。
+现代化的Vue3前端界面，为TA提供优秀的用户体验。
 
 ## 🚀 快速开始
 
@@ -177,7 +177,7 @@ frontend/
 VITE_API_BASE_URL=http://localhost:8000/api
 
 # 应用标题
-VITE_APP_TITLE=TradingAgents-CN
+VITE_APP_TITLE=TA
 ```
 
 ### 代理配置
@@ -309,4 +309,4 @@ const exampleStore = useExampleStore()
 
 ---
 
-**TradingAgents-CN Frontend v1.0.0-preview** - 现代化的股票分析平台前端
+**TA Frontend v1.0.0-preview** - 现代化的股票分析平台前端

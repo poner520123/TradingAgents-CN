@@ -1,7 +1,7 @@
-# TradingAgents-CN Backend Startup Script with Proxy Configuration
+# TA Backend Startup Script with Proxy Configuration
 # 启动后端服务，并配置选择性代理
 
-Write-Host "🚀 启动 TradingAgents-CN 后端服务..." -ForegroundColor Green
+Write-Host "🚀 启动 TA 后端服务..." -ForegroundColor Green
 Write-Host ""
 
 # 检查虚拟环境

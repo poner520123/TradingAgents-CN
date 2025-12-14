@@ -1,4 +1,4 @@
-# TradingAgents-CN 智能Docker启动脚本 (Windows PowerShell版本)
+# TA 智能Docker启动脚本 (Windows PowerShell版本)
 # 功能：自动判断是否需要重新构建Docker镜像
 # 使用：powershell -ExecutionPolicy Bypass -File scripts\smart_start.ps1
 # 
@@ -8,7 +8,7 @@
 # 3. 如果镜像存在但代码有变化 -> 执行构建启动  
 # 4. 如果镜像存在且代码无变化 -> 快速启动
 
-Write-Host "=== TradingAgents-CN Docker 智能启动脚本 ===" -ForegroundColor Green
+Write-Host "=== TA Docker 智能启动脚本 ===" -ForegroundColor Green
 Write-Host "适用环境: Windows PowerShell" -ForegroundColor Cyan
 
 # 检查是否有镜像

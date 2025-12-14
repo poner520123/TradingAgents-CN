@@ -1,5 +1,5 @@
-# TradingAgents-CN 版权信息
-# TradingAgents-CN Copyright Information
+# TA 版权信息
+# TA Copyright Information
 
 ## 📋 版权声明 / Copyright Notice
 
@@ -32,7 +32,7 @@
 
 **版权所有者 / Copyright Owner**: hsliuping  
 **邮箱 / Email**: hsliup@163.com  
-**GitHub**: https://github.com/hsliuping/TradingAgents-CN  
+**GitHub**: https://github.com/hsliuping/TA  
 **QQ群 / QQ Group**: 782124367  
 
 ## 💼 商业许可 / Commercial Licensing

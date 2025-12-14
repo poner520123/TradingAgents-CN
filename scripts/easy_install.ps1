@@ -1,4 +1,4 @@
-# TradingAgents-CN 一键安装脚本 (Windows PowerShell)
+# TA 一键安装脚本 (Windows PowerShell)
 # 功能：自动检测环境、安装依赖、配置API密钥、启动应用
 
 param(
@@ -30,7 +30,7 @@ function Show-Welcome {
     Write-ColorOutput @"
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║     🚀 TradingAgents-CN 一键安装向导                         ║
+║     🚀 TA 一键安装向导                         ║
 ║                                                              ║
 ║     让AI驱动的股票分析触手可及                               ║
 ║                                                              ║
@@ -255,7 +255,7 @@ function New-EnvFile {
     Write-Step "生成配置文件..."
     
     $envContent = @"
-# TradingAgents-CN 配置文件
+# TA 配置文件
 # 由一键安装脚本自动生成
 # 生成时间: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 

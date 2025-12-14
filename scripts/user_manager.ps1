@@ -1,4 +1,4 @@
-# TradingAgents-CN 用户密码管理工具 (PowerShell版本)
+# TA 用户密码管理工具 (PowerShell版本)
 param(
     [Parameter(Position=0)]
     [string]$Command,
@@ -16,7 +16,7 @@ param(
 # 设置控制台编码为UTF-8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-Write-Host "🔧 TradingAgents-CN 用户密码管理工具" -ForegroundColor Cyan
+Write-Host "🔧 TA 用户密码管理工具" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
 
 # 检查Python是否可用

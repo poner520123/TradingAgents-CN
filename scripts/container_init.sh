@@ -1,5 +1,5 @@
 #!/bin/bash
-# TradingAgents-CN 容器内初始化脚本
+# TA 容器内初始化脚本
 # 在Docker容器内执行系统初始化
 
 set -e
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}TradingAgents-CN 容器内初始化${NC}"
+echo -e "${CYAN}TA 容器内初始化${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN Streamlit Web界面
+TA Streamlit Web界面
 基于Streamlit的股票分析Web应用程序
 """
 
@@ -48,7 +48,7 @@ from utils.user_activity_logger import user_activity_logger
 
 # 设置页面配置
 st.set_page_config(
-    page_title="TradingAgents-CN 股票分析平台",
+    page_title="TA 股票分析平台",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -891,7 +891,7 @@ def main():
     render_header()
 
     # 侧边栏布局 - 标题在最顶部
-    st.sidebar.title("🤖 TradingAgents-CN")
+    st.sidebar.title("🤖 TA")
     st.sidebar.markdown("---")
     
     # 页面导航 - 在标题下方显示用户信息

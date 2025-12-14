@@ -1,4 +1,4 @@
-// MongoDB初始化脚本 - TradingAgents-CN v1.0.0-preview
+// MongoDB初始化脚本 - TA v1.0.0-preview
 // 创建TradingAgents数据库、用户、集合和索引
 
 print('开始初始化TradingAgents数据库...');

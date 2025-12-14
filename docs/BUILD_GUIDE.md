@@ -1,4 +1,4 @@
-# 🏗️ TradingAgents-CN Docker 镜像构建指南
+# 🏗️ TA Docker 镜像构建指南
 
 本文档说明如何为不同架构构建 Docker 镜像。
 
@@ -352,7 +352,7 @@ docker buildx imagetools inspect tradingagents-backend:v1.0.0-preview
 
 1. 查看构建日志
 2. 检查 Docker 版本和配置
-3. 提交 Issue：[GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
+3. 提交 Issue：[GitHub Issues](https://github.com/hsliuping/TA/issues)
 
 ---
 

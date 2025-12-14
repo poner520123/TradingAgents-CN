@@ -1,5 +1,5 @@
 #!/bin/bash
-# TradingAgents-CN 一键安装脚本 (Linux/Mac)
+# TA 一键安装脚本 (Linux/Mac)
 # 功能：自动检测环境、安装依赖、配置API密钥、启动应用
 
 set -e
@@ -27,7 +27,7 @@ show_welcome() {
     cat << "EOF"
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
-║     🚀 TradingAgents-CN 一键安装向导                         ║
+║     🚀 TA 一键安装向导                         ║
 ║                                                              ║
 ║     让AI驱动的股票分析触手可及                               ║
 ║                                                              ║
@@ -217,7 +217,7 @@ generate_env_file() {
     fi
     
     cat > .env << EOF
-# TradingAgents-CN 配置文件
+# TA 配置文件
 # 由一键安装脚本自动生成
 # 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
 

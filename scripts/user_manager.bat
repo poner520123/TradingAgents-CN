@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-echo 🔧 TradingAgents-CN 用户密码管理工具
+echo 🔧 TA 用户密码管理工具
 echo ================================================
 
 REM 检查Python是否可用

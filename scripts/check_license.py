@@ -39,7 +39,7 @@ def check_license_file(file_path: Path, component_name: str) -> bool:
 
 def main():
     """主函数"""
-    print("🔍 TradingAgents-CN 许可证检查")
+    print("🔍 TA 许可证检查")
     print("=" * 50)
     
     project_root = Path(__file__).parent.parent

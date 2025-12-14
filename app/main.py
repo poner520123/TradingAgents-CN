@@ -1,5 +1,5 @@
 """
-TradingAgents-CN v1.0.0-preview FastAPI Backend
+TA v1.0.0-preview FastAPI Backend
 主应用程序入口
 
 Copyright (c) 2025 hsliuping. All rights reserved.
@@ -121,7 +121,7 @@ async def _print_config_summary(logger):
     """显示配置摘要"""
     try:
         logger.info("=" * 70)
-        logger.info("📋 TradingAgents-CN Configuration Summary")
+        logger.info("📋 TA Configuration Summary")
         logger.info("=" * 70)
 
         # .env 文件路径信息
@@ -637,7 +637,7 @@ async def lifespan(app: FastAPI):
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="TradingAgents-CN API",
+    title="TA API",
     description="股票分析与批量队列系统 API",
     version=get_version(),
     docs_url="/docs" if settings.DEBUG else None,
@@ -783,7 +783,7 @@ async def root():
     """根路径，返回API信息"""
     print("🏠 根路径被访问")
     return {
-        "name": "TradingAgents-CN API",
+        "name": "TA API",
         "version": get_version(),
         "status": "running",
         "docs_url": "/docs" if settings.DEBUG else None

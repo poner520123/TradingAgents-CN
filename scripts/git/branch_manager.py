@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Git分支管理工具
-帮助管理TradingAgents-CN项目的分支
+帮助管理TA项目的分支
 """
 
 import subprocess

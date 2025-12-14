@@ -221,7 +221,7 @@ def render_login_form():
     st.markdown("""
     <div class="login-container">
         <div class="login-header">
-            <h1 class="login-title">🚀 TradingAgents-CN</h1>
+            <h1 class="login-title">🚀 TA</h1>
             <p class="login-subtitle">AI驱动的股票交易分析平台 · 让投资更智能</p>
         </div>
     </div>

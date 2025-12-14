@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本文档说明如何构建 TradingAgents-CN 的 Docker 镜像并发布到 Docker Hub。
+本文档说明如何构建 TA 的 Docker 镜像并发布到 Docker Hub。
 
 ---
 
@@ -183,7 +183,7 @@ services:
 
 **解决**: 必须在项目根目录运行：
 ```bash
-cd /path/to/TradingAgents-CN
+cd /path/to/TA
 ./scripts/publish-docker-images.sh your-username
 ```
 

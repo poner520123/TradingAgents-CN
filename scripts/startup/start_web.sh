@@ -1,7 +1,7 @@
 #!/bin/bash
-# TradingAgents-CN Web应用启动脚本
+# TA Web应用启动脚本
 
-echo "🚀 启动TradingAgents-CN Web应用..."
+echo "🚀 启动TA Web应用..."
 echo
 
 # 激活虚拟环境

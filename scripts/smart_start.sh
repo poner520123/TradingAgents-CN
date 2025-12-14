@@ -1,5 +1,5 @@
 #!/bin/bash
-# TradingAgents-CN 智能Docker启动脚本 (Linux/Mac Bash版本)
+# TA 智能Docker启动脚本 (Linux/Mac Bash版本)
 # 功能：自动判断是否需要重新构建Docker镜像
 # 使用：chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
 # 
@@ -9,7 +9,7 @@
 # 3. 如果镜像存在但代码有变化 -> 执行构建启动  
 # 4. 如果镜像存在且代码无变化 -> 快速启动
 
-echo "=== TradingAgents-CN Docker 智能启动脚本 ==="
+echo "=== TA Docker 智能启动脚本 ==="
 echo "适用环境: Linux/Mac Bash"
 
 # 检查是否有镜像

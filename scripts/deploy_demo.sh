@@ -13,7 +13,7 @@
 # - 创建默认管理员账号
 #
 # 使用方法：
-#   curl -fsSL https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/scripts/deploy_demo.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/your-org/TA/main/scripts/deploy_demo.sh | bash
 #   或
 #   bash deploy_demo.sh
 ################################################################################
@@ -29,8 +29,8 @@ NC='\033[0m' # No Color
 
 # 配置
 PROJECT_NAME="TradingAgents-Demo"
-GITHUB_REPO="https://github.com/your-org/TradingAgents-CN"
-GITHUB_RAW="https://raw.githubusercontent.com/your-org/TradingAgents-CN/main"
+GITHUB_REPO="https://github.com/your-org/TA"
+GITHUB_RAW="https://raw.githubusercontent.com/your-org/TA/main"
 
 ################################################################################
 # 工具函数
@@ -376,7 +376,7 @@ show_info() {
     echo -e "  停止服务: ${GREEN}docker compose -f docker-compose.hub.yml stop${NC}"
     echo ""
     echo -e "${BLUE}文档:${NC}"
-    echo -e "  完整文档: ${GREEN}https://github.com/your-org/TradingAgents-CN/blob/main/docs/deploy_demo_system.md${NC}"
+    echo -e "  完整文档: ${GREEN}https://github.com/your-org/TA/blob/main/docs/deploy_demo_system.md${NC}"
     echo ""
 }
 

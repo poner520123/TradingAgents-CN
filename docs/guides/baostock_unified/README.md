@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-BaoStock统一数据源集成方案为TradingAgents-CN系统提供了完整的BaoStock数据支持，包括股票基础信息、历史K线数据、实时行情和财务数据的自动化同步功能。
+BaoStock统一数据源集成方案为TA系统提供了完整的BaoStock数据支持，包括股票基础信息、历史K线数据、实时行情和财务数据的自动化同步功能。
 
 ## 🏗️ 架构设计
 
@@ -407,7 +407,7 @@ BaoStock与Tushare、AKShare形成三数据源架构：
 
 ## 🎉 总结
 
-BaoStock统一数据源集成方案为TradingAgents-CN系统提供了：
+BaoStock统一数据源集成方案为TA系统提供了：
 
 - ✅ **完整的数据覆盖**: 基础信息、行情、历史、财务数据
 - ✅ **自动化同步**: APScheduler定时任务，无需人工干预

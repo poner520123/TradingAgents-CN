@@ -87,13 +87,13 @@
 #### 📚 使用指南
 
 在使用前，建议先阅读详细的使用指南：
-- **[0、📘 TradingAgents-CN v1.0.0-preview 快速入门视频](https://www.bilibili.com/video/BV1i2CeBwEP7/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
+- **[0、📘 TA v1.0.0-preview 快速入门视频](https://www.bilibili.com/video/BV1i2CeBwEP7/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
 
-- **[1、📘 TradingAgents-CN v1.0.0-preview 使用指南](https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw)**
-- **[2、📘 使用 Docker Compose 部署TradingAgents-CN v1.0.0-preview（完全版）](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw)**
+- **[1、📘 TA v1.0.0-preview 使用指南](https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw)**
+- **[2、📘 使用 Docker Compose 部署TA v1.0.0-preview（完全版）](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw)**
 - **[3、📘 从 Docker Hub 更新 TradingAgents‑CN 镜像](https://mp.weixin.qq.com/s/WKYhW8J80Watpg8K6E_dSQ)**
-- **[4、📘 TradingAgents-CN v1.0.0-preview绿色版安装和升级指南](https://mp.weixin.qq.com/s/eoo_HeIGxaQZVT76LBbRJQ)**
-- **[5、📘 TradingAgents-CN v1.0.0-preview绿色版端口配置说明](https://mp.weixin.qq.com/s/o5QdNuh2-iKkIHzJXCj7vQ)**
+- **[4、📘 TA v1.0.0-preview绿色版安装和升级指南](https://mp.weixin.qq.com/s/eoo_HeIGxaQZVT76LBbRJQ)**
+- **[5、📘 TA v1.0.0-preview绿色版端口配置说明](https://mp.weixin.qq.com/s/o5QdNuh2-iKkIHzJXCj7vQ)**
 - **[6、📘 TradingAgents v1.0.0-preview 源码版安装手册（修订版）](https://mp.weixin.qq.com/s/cqUGf-sAzcBV19gdI4sYfA)**
 - **[7、📘 TradingAgents v1.0.0-preview 源码安装视频教程](https://www.bilibili.com/video/BV1FxCtBHEte/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
 
@@ -106,11 +106,11 @@
 
 #### 关注公众号
 
-1. **关注公众号**: 微信搜索 **"TradingAgents-CN"** 并关注
+1. **关注公众号**: 微信搜索 **"TA"** 并关注
 2. 公众号每天推送项目最新进展和使用教程
 
 
-- **微信公众号**: TradingAgents-CN（推荐）
+- **微信公众号**: TA（推荐）
 
   <img src="assets/wexin.png" alt="微信公众号" width="200"/>
 
@@ -228,7 +228,7 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 
 ### 🤝 社区贡献者致谢
 
-感谢所有为TradingAgents-CN项目做出贡献的开发者和用户！
+感谢所有为TA项目做出贡献的开发者和用户！
 
 详细的贡献者名单和贡献内容请查看：**[📋 贡献者名单](CONTRIBUTORS.md)**
 
@@ -287,10 +287,10 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 
 ## 📞 联系方式
 
-- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
+- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TA/issues)
 - **邮箱**: hsliup@163.com
 - 项目ＱＱ群：1009816091
-- 项目微信公众号：TradingAgents-CN
+- 项目微信公众号：TA
 
   <img src="assets/wexin.png" alt="微信公众号" width="200"/>
 
@@ -312,6 +312,6 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 
 **🌟 如果这个项目对您有帮助，请给我们一个 Star！**
 
-[⭐ Star this repo](https://github.com/hsliuping/TradingAgents-CN) | [🍴 Fork this repo](https://github.com/hsliuping/TradingAgents-CN/fork) | [📖 Read the docs](./docs/)
+[⭐ Star this repo](https://github.com/hsliuping/TA) | [🍴 Fork this repo](https://github.com/hsliuping/TA/fork) | [📖 Read the docs](./docs/)
 
 </div>

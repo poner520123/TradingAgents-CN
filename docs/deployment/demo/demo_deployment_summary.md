@@ -60,7 +60,7 @@
 
 **命令**：
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/scripts/deploy_demo.sh | bash
+curl -fsSL https://raw.githubusercontent.com/your-org/TA/main/scripts/deploy_demo.sh | bash
 ```
 
 **自动完成的操作**：
@@ -100,8 +100,8 @@ sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-org/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/your-org/TA.git
+cd TA
 
 # 或下载必要文件
 mkdir -p TradingAgents-Demo/{install,scripts}

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    恢复 TradingAgents-CN Docker 数据卷
+    恢复 TA Docker 数据卷
 
 .DESCRIPTION
     此脚本用于从备份恢复 MongoDB 和 Redis 数据卷

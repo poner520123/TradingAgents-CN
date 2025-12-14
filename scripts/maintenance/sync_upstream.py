@@ -19,7 +19,7 @@ class UpstreamSyncer:
     
     def __init__(self):
         self.upstream_repo = "TauricResearch/TradingAgents"
-        self.origin_repo = "hsliuping/TradingAgents-CN"
+        self.origin_repo = "hsliuping/TA"
         self.upstream_url = f"https://github.com/{self.upstream_repo}.git"
         self.github_api_base = "https://api.github.com"
         

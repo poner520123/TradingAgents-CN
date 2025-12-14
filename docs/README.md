@@ -1,6 +1,6 @@
-# TradingAgents-CN 文档中心 (v0.1.12)
+# TA 文档中心 (v0.1.12)
 
-欢迎来到 TradingAgents-CN 多智能体金融交易框架的文档中心。本文档适用于中文增强版 v0.1.12，包含智能新闻分析模块、多LLM提供商集成、模型选择持久化、完整的A股支持、国产LLM集成、Docker容器化部署和专业报告导出功能。
+欢迎来到 TA 多智能体金融交易框架的文档中心。本文档适用于中文增强版 v0.1.12，包含智能新闻分析模块、多LLM提供商集成、模型选择持久化、完整的A股支持、国产LLM集成、Docker容器化部署和专业报告导出功能。
 
 ## 🎯 版本亮点 (v0.1.12)
 
@@ -126,7 +126,7 @@
 
 ## 联系我们
 
-- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
+- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TA/issues)
 - **邮箱**: hsliup@163.com
 - 项目ＱＱ群：782124367
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)

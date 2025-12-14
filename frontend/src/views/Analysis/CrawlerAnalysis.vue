@@ -97,18 +97,47 @@
         />
       </div>
     </el-card>
+
+    <!-- 爬虫状态悬浮框 -->
+    <div v-if="crawlerStatus.visible" class="crawler-status-float" :class="{ 'completed': crawlerStatus.finished }">
+      <div class="status-header">
+        <el-icon v-if="!crawlerStatus.finished" class="is-loading"><Loading /></el-icon>
+        <el-icon v-else class="success-icon"><CircleCheckFilled /></el-icon>
+        <span class="status-title">{{ crawlerStatus.title }}</span>
+        <el-icon class="close-icon" @click="closeCrawlerStatus"><Close /></el-icon>
+      </div>
+      <div class="status-content">
+        <p class="current-action">{{ crawlerStatus.currentAction }}</p>
+        <div class="progress-bar" v-if="crawlerStatus.total > 0">
+           <el-progress 
+            :percentage="crawlerStatus.percentage" 
+            :status="crawlerStatus.finished ? 'success' : ''"
+            :stroke-width="6"
+            :show-text="false"
+          />
+          <span class="progress-text">{{ crawlerStatus.current }}/{{ crawlerStatus.total }}</span>
+        </div>
+        <div class="log-container" ref="logContainer">
+          <div v-for="(log, index) in crawlerLogs" :key="index" class="log-item">
+            <span class="log-time">{{ log.time }}</span>
+            <span class="log-msg">{{ log.message }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { DataAnalysis, Plus } from '@element-plus/icons-vue'
+import { DataAnalysis, Plus, Loading, Close, CircleCheckFilled } from '@element-plus/icons-vue'
 import { getCrawlerData, startCrawl, type CrawlerData } from '@/api/crawler'
 import { favoritesApi } from '@/api/favorites'
 import { getStockCodeByName, loadStockNameCodeMap, getStockCodesByNames } from '@/utils/stockNameCodeMap'
 import { useNotificationStore } from '@/stores/notifications'
+import { formatDateTime } from '@/utils/datetime'
 
 const router = useRouter()
 const loading = ref(false)
@@ -118,6 +147,35 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const crawlPages = ref(5)
+
+// 爬虫状态管理
+interface CrawlerStatus {
+  visible: boolean
+  title: string
+  currentAction: string
+  current: number
+  total: number
+  percentage: number
+  finished: boolean
+}
+
+const crawlerStatus = ref<CrawlerStatus>({
+  visible: false,
+  title: '爬虫任务',
+  currentAction: '准备中...',
+  current: 0,
+  total: 0,
+  percentage: 0,
+  finished: false
+})
+
+interface LogItem {
+  time: string
+  message: string
+}
+
+const crawlerLogs = ref<LogItem[]>([])
+const logContainer = ref<HTMLElement | null>(null)
 
 // WebSocket连接引用
 let ws: WebSocket | null = null
@@ -132,6 +190,23 @@ onMounted(async () => {
   await loadStockNameCodeMap()
   await fetchData()
   
+  // 从localStorage读取自动爬取状态
+  const savedAutoCrawlEnabled = localStorage.getItem('autoCrawlEnabled')
+  const savedAutoCrawlInterval = localStorage.getItem('autoCrawlInterval')
+  
+  if (savedAutoCrawlEnabled) {
+    autoCrawlEnabled.value = savedAutoCrawlEnabled === 'true'
+  }
+  
+  if (savedAutoCrawlInterval) {
+    autoCrawlInterval.value = parseInt(savedAutoCrawlInterval)
+  }
+  
+  // 如果之前开启了自动爬取，恢复自动爬取
+  if (autoCrawlEnabled.value) {
+    startAutoCrawl()
+  }
+  
   // 添加WebSocket消息监听
   const token = localStorage.getItem('auth-token') || ''
   if (token) {
@@ -140,9 +215,15 @@ onMounted(async () => {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data)
-        if (message.type === 'notification' && message.data?.type === 'crawler') {
+        
+        // 处理爬虫进度通知
+        if (message.type === 'notification' && message.data?.type === 'progress' && message.data?.source === 'crawler') {
+          handleProgressUpdate(message.data)
+        }
+        // 处理爬虫完成通知
+        else if (message.type === 'notification' && message.data?.type === 'crawler') {
           console.log('[CrawlerAnalysis] 收到爬虫完成通知，自动刷新数据')
-          fetchData()
+          handleCrawlerCompleted(message.data)
         }
       } catch (error) {
         console.error('[CrawlerAnalysis] 解析WebSocket消息失败:', error)
@@ -243,6 +324,9 @@ const handleStartCrawl = async () => {
 
 // 自动爬取开关切换
 const handleAutoCrawlToggle = () => {
+  // 保存状态到localStorage
+  localStorage.setItem('autoCrawlEnabled', autoCrawlEnabled.value.toString())
+  
   if (autoCrawlEnabled.value) {
     startAutoCrawl()
     ElMessage.success(`已开启自动爬取，每 ${autoCrawlInterval.value} 分钟执行一次`)
@@ -254,6 +338,9 @@ const handleAutoCrawlToggle = () => {
 
 // 自动爬取间隔改变
 const handleIntervalChange = () => {
+  // 保存间隔到localStorage
+  localStorage.setItem('autoCrawlInterval', autoCrawlInterval.value.toString())
+  
   if (autoCrawlEnabled.value) {
     stopAutoCrawl()
     startAutoCrawl()
@@ -287,6 +374,8 @@ const handleStopCrawl = () => {
   if (autoCrawlEnabled.value) {
     autoCrawlEnabled.value = false
     stopAutoCrawl()
+    // 保存关闭状态到localStorage
+    localStorage.setItem('autoCrawlEnabled', 'false')
   }
   
   ElMessage.success('爬虫已关闭')
@@ -351,6 +440,58 @@ const handleSizeChange = (val: number) => {
 const handleCurrentChange = (val: number) => {
   currentPage.value = val
   fetchData()
+}
+
+// 处理进度更新
+const handleProgressUpdate = (notification: any) => {
+  if (!crawlerStatus.value.visible) {
+    crawlerStatus.value.visible = true
+    crawlerStatus.value.finished = false
+    crawlerStatus.value.percentage = 0
+    crawling.value = true
+  }
+  
+  const data = notification.data || {}
+  crawlerStatus.value.currentAction = notification.content
+  
+  if (data.page && data.total_pages) {
+    crawlerStatus.value.current = data.page
+    crawlerStatus.value.total = data.total_pages
+    crawlerStatus.value.percentage = Math.floor((data.current_step / data.total_pages) * 100)
+  }
+  
+  addLog(notification.content)
+}
+
+// 处理爬虫完成
+const handleCrawlerCompleted = (notification: any) => {
+  crawlerStatus.value.currentAction = '爬取完成'
+  crawlerStatus.value.percentage = 100
+  crawlerStatus.value.finished = true
+  crawling.value = false
+  
+  addLog(notification.content)
+  
+  // 刷新数据
+  fetchData()
+  
+  // 3秒后自动关闭状态框，除非用户鼠标悬停（暂未实现悬停保持）
+  setTimeout(() => {
+    // crawlerStatus.value.visible = false
+  }, 5000)
+}
+
+const addLog = (msg: string) => {
+  const time = new Date().toLocaleTimeString()
+  crawlerLogs.value.unshift({ time, message: msg })
+  // 只保留最近5条日志
+  if (crawlerLogs.value.length > 5) {
+    crawlerLogs.value.pop()
+  }
+}
+
+const closeCrawlerStatus = () => {
+  crawlerStatus.value.visible = false
 }
 
 // 组件卸载时清理资源
@@ -418,7 +559,130 @@ onUnmounted(() => {
 .text-green-500 {
   color: #67c23a;
 }
+.text-green-500 {
+  color: #67c23a;
+}
 .font-bold {
   font-weight: bold;
+}
+
+/* 爬虫状态悬浮框样式 */
+.crawler-status-float {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 320px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 2000;
+  border: 1px solid var(--el-border-color-lighter);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &.completed {
+    border-color: var(--el-color-success-light-5);
+    background: rgba(240, 249, 235, 0.95);
+  }
+
+  .status-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--el-fill-color-light);
+
+    .status-title {
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      flex: 1;
+      margin-left: 8px;
+    }
+
+    .is-loading {
+      color: var(--el-color-primary);
+      animation: rotate 1.5s linear infinite;
+    }
+    
+    .success-icon {
+      color: var(--el-color-success);
+      font-size: 18px;
+    }
+
+    .close-icon {
+      cursor: pointer;
+      color: var(--el-text-color-secondary);
+      transition: color 0.2s;
+      
+      &:hover {
+        color: var(--el-color-danger);
+      }
+    }
+  }
+
+  .status-content {
+    padding: 16px;
+
+    .current-action {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: var(--el-text-color-primary);
+      font-weight: 500;
+    }
+
+    .progress-bar {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      
+      .el-progress {
+        flex: 1;
+      }
+      
+      .progress-text {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+        width: 40px;
+        text-align: right;
+      }
+    }
+
+    .log-container {
+      background: var(--el-fill-color-lighter);
+      border-radius: 6px;
+      padding: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      
+      .log-item {
+        display: flex;
+        gap: 8px;
+        font-size: 12px;
+        line-height: 1.6;
+        margin-bottom: 4px;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+
+        .log-time {
+          color: var(--el-text-color-placeholder);
+          white-space: nowrap;
+        }
+        
+        .log-msg {
+          color: var(--el-text-color-regular);
+        }
+      }
+    }
+  }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>
