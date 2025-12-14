@@ -3,14 +3,16 @@
 # TA v1.0.0-preview Docker Compose配置
 # 支持前后端分离部署
 
+name: ta
+
 services:
   # FastAPI 后端服务
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    image: tradingagents-backend:v1.0.0-preview
-    container_name: tradingagents-backend
+    image: ta-backend:latest
+    container_name: ta-backend
     ports:
       - "8000:8000"
     volumes:
@@ -27,13 +29,13 @@ services:
       PYTHONDONTWRITEBYTECODE: 1
       TZ: "Asia/Shanghai"
       # 日志配置
-      TRADINGAGENTS_LOG_LEVEL: "INFO"
-      TRADINGAGENTS_LOG_DIR: "/app/logs"
-      TRADINGAGENTS_LOG_FILE: "/app/logs/tradingagents.log"
+      TA_LOG_LEVEL: "INFO"
+      TA_LOG_DIR: "/app/logs"
+      TA_LOG_FILE: "/app/logs/ta.log"
       # Docker专用数据库配置
-      TRADINGAGENTS_MONGODB_URL: mongodb://admin:admin123@mongodb:27017/tradingagents?authSource=admin
-      TRADINGAGENTS_REDIS_URL: redis://:admin123@redis:6379
-      TRADINGAGENTS_CACHE_TYPE: redis
+      TA_MONGODB_URL: mongodb://admin:admin123@mongodb:27017/ta?authSource=admin
+      TA_REDIS_URL: redis://:admin123@redis:6379
+      TA_CACHE_TYPE: redis
       # 显式覆盖.env中的localhost配置
       MONGODB_HOST: "mongodb"
       REDIS_HOST: "redis"
@@ -67,14 +69,23 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '512M'
 
   # Vue 3 前端服务
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    image: tradingagents-frontend:v1.0.0-preview
-    container_name: tradingagents-frontend
+    image: ta-frontend:latest
+    container_name: ta-frontend
     ports:
       - "3000:80"
     environment:
@@ -96,20 +107,29 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "100m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "2"
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '256M'
+        reservations:
+          cpus: '0.25'
+          memory: '128M'
 
   # MongoDB 数据库服务
   mongodb:
     image: mongo:4.4
-    container_name: tradingagents-mongodb
+    container_name: ta-mongodb
     restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin123
-      MONGO_INITDB_DATABASE: tradingagents
+      MONGO_INITDB_DATABASE: ta
       TZ: "Asia/Shanghai"
     volumes:
       - mongodb_data:/data/db
@@ -127,17 +147,26 @@ services:
       options:
         max-size: "50m"
         max-file: "2"
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '512M'
 
   # Redis 缓存服务
   redis:
     image: redis:7-alpine
-    container_name: tradingagents-redis
+    container_name: ta-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     environment:
       TZ: "Asia/Shanghai"
-    command: redis-server --appendonly yes --requirepass admin123
+    command: redis-server --appendonly yes --requirepass admin123 --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     networks:
@@ -151,13 +180,22 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "50m"
-        max-file: "2"
+        max-size: "25m"
+        max-file: "1"
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '256M'
+        reservations:
+          cpus: '0.25'
+          memory: '128M'
 
   # Redis Commander 管理界面（可选）
   redis-commander:
     image: ghcr.io/joeferner/redis-commander:latest
-    container_name: tradingagents-redis-commander
+    container_name: ta-redis-commander
     restart: unless-stopped
     ports:
       - "8081:8081"
@@ -180,7 +218,7 @@ services:
   # Mongo Express 管理界面（可选）
   mongo-express:
     image: mongo-express:latest
-    container_name: tradingagents-mongo-express
+    container_name: ta-mongo-express
     restart: unless-stopped
     ports:
       - "8082:8081"
@@ -202,13 +240,13 @@ services:
 volumes:
   mongodb_data:
     driver: local
-    name: tradingagents_mongodb_data
+    name: ta_mongodb_data
   redis_data:
     driver: local
-    name: tradingagents_redis_data
+    name: ta_redis_data
 
 # 网络定义
 networks:
   tradingagents-network:
     driver: bridge
-    name: tradingagents-network
+    name: ta-network

@@ -599,13 +599,19 @@ class SimpleAnalysisService:
         self._progress_trackers: Dict[str, RedisProgressTracker] = {}
 
         # 🔧 创建共享的线程池，支持并发执行多个分析任务
-        # 默认最多同时执行3个分析任务（可根据服务器资源调整）
+        from app.core.config import settings
         import concurrent.futures
-        self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        
+        # 使用配置文件中的线程池大小，提高并发处理能力
+        thread_pool_size = settings.ANALYSIS_THREAD_POOL_SIZE
+        
+        self._thread_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=thread_pool_size
+        )
 
         logger.info(f"🔧 [服务初始化] SimpleAnalysisService 实例ID: {id(self)}")
         logger.info(f"🔧 [服务初始化] 内存管理器实例ID: {id(self.memory_manager)}")
-        logger.info(f"🔧 [服务初始化] 线程池最大并发数: 3")
+        logger.info(f"🔧 [服务初始化] 线程池最大并发数: {thread_pool_size}")
 
         # 设置 WebSocket 管理器
         # 简单的股票名称缓存，减少重复查询
@@ -1964,12 +1970,18 @@ class SimpleAnalysisService:
             logger.info(f"📋 [Tasks] 准备从内存读取所有任务: status={status}, limit={limit}, offset={offset}")
             tasks_in_mem = await self.memory_manager.list_all_tasks(
                 status=task_status,
-                limit=limit * 2,
-                offset=0
+                limit=limit,
+                offset=offset
             )
             logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
 
-            # 2) 从 MongoDB 读取任务
+            # 如果内存中已返回足够数据，直接返回
+            if len(tasks_in_mem) >= limit:
+                results = self._enrich_stock_names(tasks_in_mem[:limit])
+                logger.info(f"📋 [Tasks] 内存数据足够，直接返回 {len(results)} 条")
+                return results
+
+            # 2) 从 MongoDB 读取补充任务
             db = get_mongo_db()
             collection = db["analysis_tasks"]
 
@@ -1977,42 +1989,41 @@ class SimpleAnalysisService:
             if task_status:
                 query["status"] = task_status.value
 
-            count = await collection.count_documents(query)
-            logger.info(f"📋 [Tasks] MongoDB 任务总数: {count}")
-
-            cursor = collection.find(query).sort("start_time", -1).limit(limit * 2)
+            # 计算需要从MongoDB读取的数据量
+            need_more = limit - len(tasks_in_mem)
+            cursor = collection.find(query).sort("start_time", -1).limit(need_more)
             tasks_from_db = []
             async for doc in cursor:
                 doc.pop("_id", None)
                 tasks_from_db.append(doc)
 
-            logger.info(f"📋 [Tasks] MongoDB 返回数量: {len(tasks_from_db)}")
+            logger.info(f"📋 [Tasks] MongoDB 返回补充数据: {len(tasks_from_db)}")
 
-            # 3) 合并任务（内存优先）
+            # 3) 合并任务（内存优先，避免重复）
             task_dict = {}
 
-            # 先添加 MongoDB 中的任务
-            for task in tasks_from_db:
+            # 先添加内存中的任务
+            for task in tasks_in_mem:
                 task_id = task.get("task_id")
                 if task_id:
                     task_dict[task_id] = task
 
-            # 再添加内存中的任务（覆盖 MongoDB 中的同名任务）
-            for task in tasks_in_mem:
+            # 再添加MongoDB中的任务，避免重复
+            for task in tasks_from_db:
                 task_id = task.get("task_id")
-                if task_id:
+                if task_id and task_id not in task_dict:
                     task_dict[task_id] = task
 
             # 转换为列表并按时间排序
             merged_tasks = list(task_dict.values())
             merged_tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
 
-            # 分页
-            results = merged_tasks[offset:offset + limit]
+            # 分页（已按offset从内存读取，此处直接取前limit条）
+            results = merged_tasks[:limit]
 
             # 为结果补齐股票名称
             results = self._enrich_stock_names(results)
-            logger.info(f"📋 [Tasks] 合并后返回数量: {len(results)} (内存: {len(tasks_in_mem)}, MongoDB: {count})")
+            logger.info(f"📋 [Tasks] 合并后返回数量: {len(results)} (内存: {len(tasks_in_mem)}, MongoDB: {len(tasks_from_db)})")
             return results
         except Exception as outer_e:
             logger.error(f"❌ list_all_tasks 外层异常: {outer_e}", exc_info=True)
@@ -2053,10 +2064,16 @@ class SimpleAnalysisService:
             tasks_in_mem = await self.memory_manager.list_user_tasks(
                 user_id=user_id,
                 status=task_status,
-                limit=limit * 2,  # 多读一些，后面合并去重
-                offset=0  # 内存中的任务不多，全部读取
+                limit=limit,
+                offset=offset
             )
             logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
+            
+            # 对于非running状态，如果内存中已返回足够数据，直接返回
+            if len(tasks_in_mem) >= limit and status not in ["processing", "running"]:
+                results = self._enrich_stock_names(tasks_in_mem[:limit])
+                logger.info(f"📋 [Tasks] 内存数据足够，直接返回 {len(results)} 条")
+                return results
 
             # 2) 🔧 对于 processing/running 状态，需要合并 MongoDB 数据以获取最新进度
             # 因为 graph_progress_callback 可能直接更新了 MongoDB，而内存数据可能是旧的
@@ -2107,7 +2124,7 @@ class SimpleAnalysisService:
                 logger.info(f"📋 [Tasks] MongoDB 查询条件: {query}")
                 # 读取更多数据用于合并
                 cursor = db.analysis_tasks.find(query).sort("created_at", -1).limit(limit * 2)
-                async for doc in cursor:
+                for doc in cursor:
                     count += 1
                     # 兼容 user_id 或 user 字段
                     user_field_val = doc.get("user_id", doc.get("user"))
@@ -2724,7 +2741,7 @@ class SimpleAnalysisService:
             project_root = Path(__file__).parent.parent.parent
 
             # 确定results目录路径 - 与web目录保持一致
-            results_dir_env = os.getenv("TRADINGAGENTS_RESULTS_DIR")
+            results_dir_env = os.getenv("TA_RESULTS_DIR")
             if results_dir_env:
                 if not os.path.isabs(results_dir_env):
                     results_dir = project_root / results_dir_env

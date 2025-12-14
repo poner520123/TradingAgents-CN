@@ -41,7 +41,7 @@
 
     <el-menu-item index="/favorites">
       <el-icon><Star /></el-icon>
-      <template #title>我的自选股</template>
+      <template #title>自选股</template>
     </el-menu-item>
 
     

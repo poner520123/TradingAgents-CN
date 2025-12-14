@@ -264,6 +264,14 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
+    # 创建默认管理员用户
+    try:
+        from app.services.user_service import user_service
+        await user_service.create_admin_user()
+        logger.info("✅ 默认管理员用户已创建或已存在")
+    except Exception as e:
+        logger.error(f"❌ 创建管理员用户失败: {e}")
+
     #  配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
     try:
         from app.core.config_bridge import bridge_config_to_env
@@ -665,6 +673,10 @@ app.add_middleware(
 # 操作日志中间件
 app.add_middleware(OperationLogMiddleware)
 
+# API安全增强：速率限制中间件
+from app.middleware.rate_limit import RateLimitMiddleware, QuotaMiddleware
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(QuotaMiddleware)
 
 # 请求日志中间件
 @app.middleware("http")

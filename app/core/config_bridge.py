@@ -125,19 +125,19 @@ def bridge_config_to_env():
         # 2. 桥接默认模型配置
         default_model = unified_config.get_default_model()
         if default_model:
-            os.environ['TRADINGAGENTS_DEFAULT_MODEL'] = default_model
+            os.environ['TA_DEFAULT_MODEL'] = default_model
             logger.info(f"  ✓ 桥接默认模型: {default_model}")
             bridged_count += 1
 
         quick_model = unified_config.get_quick_analysis_model()
         if quick_model:
-            os.environ['TRADINGAGENTS_QUICK_MODEL'] = quick_model
+            os.environ['TA_QUICK_MODEL'] = quick_model
             logger.info(f"  ✓ 桥接快速分析模型: {quick_model}")
             bridged_count += 1
 
         deep_model = unified_config.get_deep_analysis_model()
         if deep_model:
-            os.environ['TRADINGAGENTS_DEEP_MODEL'] = deep_model
+            os.environ['TA_DEEP_MODEL'] = deep_model
             logger.info(f"  ✓ 桥接深度分析模型: {deep_model}")
             bridged_count += 1
 
@@ -516,11 +516,11 @@ def get_bridged_model(model_type: str = "default") -> Optional[str]:
         模型名称，如果不存在返回 None
     """
     if model_type == "quick":
-        return os.environ.get('TRADINGAGENTS_QUICK_MODEL')
+        return os.environ.get('TA_QUICK_MODEL')
     elif model_type == "deep":
-        return os.environ.get('TRADINGAGENTS_DEEP_MODEL')
+        return os.environ.get('TA_DEEP_MODEL')
     else:
-        return os.environ.get('TRADINGAGENTS_DEFAULT_MODEL')
+        return os.environ.get('TA_DEFAULT_MODEL')
 
 
 def clear_bridged_config():
@@ -531,9 +531,9 @@ def clear_bridged_config():
     """
     keys_to_clear = [
         # 模型配置
-        'TRADINGAGENTS_DEFAULT_MODEL',
-        'TRADINGAGENTS_QUICK_MODEL',
-        'TRADINGAGENTS_DEEP_MODEL',
+        'TA_DEFAULT_MODEL',
+        'TA_QUICK_MODEL',
+        'TA_DEEP_MODEL',
         # 数据源 API 密钥
         'TUSHARE_TOKEN',
         'FINNHUB_API_KEY',

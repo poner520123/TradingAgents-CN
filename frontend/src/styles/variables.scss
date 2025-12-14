@@ -1,11 +1,35 @@
 // SCSS变量定义
 
-// 颜色变量
+// 主题模式变量
+$light-theme: 'light';
+$dark-theme: 'dark';
+
+// 颜色变量 - 基础颜色
 $primary-color: #409EFF;
 $success-color: #67C23A;
 $warning-color: #E6A23C;
 $danger-color: #F56C6C;
 $info-color: #909399;
+
+// 浅色主题颜色
+$light-bg-primary: #ffffff;
+$light-bg-secondary: #f5f7fa;
+$light-bg-tertiary: #e4e7ed;
+$light-text-primary: #303133;
+$light-text-secondary: #606266;
+$light-text-tertiary: #909399;
+$light-border-color: #dcdfe6;
+$light-shadow-color: rgba(0, 0, 0, 0.1);
+
+// 暗黑主题颜色
+$dark-bg-primary: #1a1a1a;
+$dark-bg-secondary: #2c3e50;
+$dark-bg-tertiary: #34495e;
+$dark-text-primary: #ffffff;
+$dark-text-secondary: #b0b0b0;
+$dark-text-tertiary: #808080;
+$dark-border-color: #404040;
+$dark-shadow-color: rgba(0, 0, 0, 0.3);
 
 // 间距变量
 $spacing-xs: 4px;

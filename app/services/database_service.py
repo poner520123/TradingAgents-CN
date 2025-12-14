@@ -30,8 +30,8 @@ class DatabaseService:
     """数据库管理服务"""
 
     def __init__(self):
-        self.backup_dir = os.path.join(settings.TRADINGAGENTS_DATA_DIR, "backups")
-        self.export_dir = os.path.join(settings.TRADINGAGENTS_DATA_DIR, "exports")
+        self.backup_dir = os.path.join(settings.TA_DATA_DIR, "backups")
+        self.export_dir = os.path.join(settings.TA_DATA_DIR, "exports")
 
         # 确保目录存在
         os.makedirs(self.backup_dir, exist_ok=True)

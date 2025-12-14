@@ -2,7 +2,7 @@
 用户服务 - 基于数据库的用户管理
 """
 
-import hashlib
+import bcrypt
 import time
 from datetime import datetime
 from typing import Optional, Dict, Any, List
@@ -31,6 +31,27 @@ class UserService:
         self.client = MongoClient(settings.MONGO_URI)
         self.db = self.client[settings.MONGO_DB]
         self.users_collection = self.db.users
+        self._ensure_indexes()
+    
+    def _ensure_indexes(self):
+        """确保索引已创建"""
+        try:
+            # 用户名唯一索引（用于登录和用户查找）
+            self.users_collection.create_index([("username", 1)], unique=True, background=True)
+            # 邮箱唯一索引（用于用户注册和验证）
+            self.users_collection.create_index([("email", 1)], unique=True, background=True)
+            # 用户ID索引（用于用户查询）
+            self.users_collection.create_index([("_id", 1)], background=True)
+            # 活跃状态索引（用于管理用户）
+            self.users_collection.create_index([("is_active", 1)], background=True)
+            # 管理员状态索引（用于管理用户）
+            self.users_collection.create_index([("is_admin", 1)], background=True)
+            # 最后登录时间索引（用于统计和分析）
+            self.users_collection.create_index([("last_login", -1)], background=True)
+            # 注册时间索引（用于统计和分析）
+            self.users_collection.create_index([("created_at", -1)], background=True)
+        except Exception as e:
+            logger.warning(f"创建索引失败: {e}")
 
     def close(self):
         """关闭数据库连接"""
@@ -44,14 +65,14 @@ class UserService:
     
     @staticmethod
     def hash_password(password: str) -> str:
-        """密码哈希"""
-        # 使用 bcrypt 会更安全，但为了兼容性先使用 SHA-256
-        return hashlib.sha256(password.encode()).hexdigest()
+        """密码哈希 - 使用bcrypt算法"""
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password.encode(), salt).decode()
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """验证密码"""
-        return UserService.hash_password(plain_password) == hashed_password
+        """验证密码 - 使用bcrypt算法"""
+        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
     
     async def create_user(self, user_data: UserCreate) -> Optional[User]:
         """创建用户"""

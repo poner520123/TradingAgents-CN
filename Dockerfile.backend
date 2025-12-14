@@ -2,8 +2,8 @@
 # 前后端分离架构 - 后端服务
 # 支持多架构: amd64, arm64
 
-# 使用 Debian Bookworm (稳定版) 而不是 Trixie (测试版)
-FROM python:3.10-slim-bookworm
+# 多阶段构建：构建阶段
+FROM python:3.10-slim-bookworm AS builder
 
 # 获取构建架构信息
 ARG TARGETARCH
@@ -15,9 +15,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 创建必需的目录
-RUN mkdir -p /app/logs /app/data /app/config
-
 # 简化版：只安装必要的系统依赖，移除可能导致构建问题的复杂包
 RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
@@ -26,7 +23,8 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        fontconfig \
+        gcc \
+        libc6-dev \
         wget && \
     rm -rf /var/lib/apt/lists/*
 
@@ -43,18 +41,45 @@ RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install --prefer-binary . -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install --prefer-binary pdfkit -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 复制后端代码和必需模块
+# 多阶段构建：运行阶段
+FROM python:3.10-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TZ=Asia/Shanghai
+
+WORKDIR /app
+
+# 创建必需的目录
+RUN mkdir -p /app/logs /app/data /app/config /app/scripts
+
+# 安装运行时依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        fontconfig \
+        libfontconfig1 \
+        wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# 从构建阶段复制Python依赖
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# 复制后端代码和必需模块（只复制运行时需要的目录）
 COPY app ./app
 COPY tradingagents ./tradingagents
 COPY config ./config
-COPY scripts ./scripts
-COPY docs ./docs
-COPY install ./install
+COPY scripts/setup ./scripts/setup
+COPY scripts/user_password_manager.py ./scripts/
+COPY scripts/mongo-init.js ./scripts/
 
 # 复制Docker环境配置文件
 COPY .env.docker ./.env
 
-# 暴露后端端口（与docker-compose.v1.0.0.yml一致）
+# 暴露后端端口（与docker-compose.yml一致）
 EXPOSE 8000
 
 # Docker环境标识

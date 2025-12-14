@@ -357,8 +357,8 @@ async def get_task_result(
 
             loaded_reports = {}
             try:
-                # 1) 尝试从环境变量 TRADINGAGENTS_RESULTS_DIR 指定的位置读取
-                base_env = os.getenv('TRADINGAGENTS_RESULTS_DIR')
+                # 1) 尝试从环境变量 TA_RESULTS_DIR 指定的位置读取
+                base_env = os.getenv('TA_RESULTS_DIR')
                 project_root = Path.cwd()
                 if base_env:
                     base_path = Path(base_env)
@@ -367,17 +367,15 @@ async def get_task_result(
                 else:
                     base_path = project_root / 'results'
 
-                candidate_dirs = []
+                # 只检查主要结果目录，减少不必要的文件系统访问
                 if stock_symbol and analysis_date:
-                    candidate_dirs.append(base_path / stock_symbol / analysis_date / 'reports')
-                # 2) 兼容其他保存路径
-                if stock_symbol and analysis_date:
-                    candidate_dirs.append(project_root / 'data' / 'analysis_results' / stock_symbol / analysis_date / 'reports')
-                    candidate_dirs.append(project_root / 'data' / 'analysis_results' / 'detailed' / stock_symbol / analysis_date / 'reports')
-
-                for d in candidate_dirs:
-                    if d.exists() and d.is_dir():
-                        for f in d.glob('*.md'):
+                    # 只使用一个主要目录，减少目录遍历
+                    main_dir = base_path / stock_symbol / analysis_date / 'reports'
+                    if main_dir.exists() and main_dir.is_dir():
+                        # 只加载前5个报告文件，避免过多IO操作
+                        for i, f in enumerate(main_dir.glob('*.md')):
+                            if i >= 5:  # 限制加载数量，提高响应速度
+                                break
                             try:
                                 content = f.read_text(encoding='utf-8')
                                 if content and content.strip():

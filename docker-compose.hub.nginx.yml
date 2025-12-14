@@ -83,9 +83,9 @@ services:
       - .env
     environment:
       TZ: "Asia/Shanghai"
-      TRADINGAGENTS_LOG_LEVEL: "INFO"
-      TRADINGAGENTS_LOG_DIR: "/app/logs"
-      TRADINGAGENTS_LOG_FILE: "/app/logs/tradingagents.log"
+      TA_LOG_LEVEL: "INFO"
+      TA_LOG_DIR: "/app/logs"
+      TA_LOG_FILE: "/app/logs/ta.log"
       # MongoDB配置（使用 root 用户）
       MONGODB_HOST: "mongodb"
       MONGODB_PORT: "27017"

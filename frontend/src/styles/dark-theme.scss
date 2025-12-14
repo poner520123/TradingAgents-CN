@@ -4,7 +4,7 @@
  */
 
 // 暗色主题下的全局样式优化
-html.dark {
+[data-theme="dark"] {
   // 全局背景设为纯黑
   background-color: #000000 !important;
 

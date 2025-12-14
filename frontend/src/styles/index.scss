@@ -5,16 +5,45 @@
   box-sizing: border-box;
 }
 
+// 主题CSS变量定义
+:root {
+  // 浅色主题
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f7fa;
+  --bg-tertiary: #e4e7ed;
+  --text-primary: #303133;
+  --text-secondary: #606266;
+  --text-tertiary: #909399;
+  --border-color: #dcdfe6;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+// 暗黑主题样式
+[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2c3e50;
+  --bg-tertiary: #34495e;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #808080;
+  --border-color: #404040;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
 html, body {
   margin: 0;
   padding: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-// 优化标题样式（浅色主题）
+// 优化标题样式
 h1, h2, h3, h4, h5, h6 {
-  color: #1a202c;
+  color: var(--text-primary);
   font-weight: 600;
+  transition: color 0.3s ease;
 }
 
 h1 {
@@ -44,7 +73,7 @@ h6 {
 // 优化卡片标题
 .el-card__header {
   h1, h2, h3, h4, h5, h6 {
-    color: #1a202c;
+    color: var(--text-primary);
     font-weight: 600;
     margin: 0;
   }
@@ -54,8 +83,104 @@ h6 {
 .page-title,
 .section-title,
 .card-title {
-  color: #1a202c !important;
+  color: var(--text-primary) !important;
   font-weight: 600 !important;
+  transition: color 0.3s ease;
+}
+
+// 全局背景和文本颜色
+#app {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// 暗黑模式下的Element Plus组件样式优化
+[data-theme="dark"] {
+  // 卡片组件
+  .el-card {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+  }
+  
+  // 表格组件
+  .el-table {
+    background-color: var(--bg-secondary);
+    
+    .el-table__header-wrapper th {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-color: var(--border-color);
+    }
+    
+    .el-table__body-wrapper td {
+      border-color: var(--border-color);
+    }
+    
+    .el-table__empty-block {
+      background-color: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+  }
+  
+  // 菜单组件
+  .el-menu {
+    background-color: var(--bg-secondary);
+    
+    .el-menu-item {
+      color: var(--text-primary);
+      
+      &:hover,
+      &:focus,
+      &.is-active {
+        background-color: var(--bg-tertiary);
+      }
+    }
+  }
+  
+  // 输入组件
+  .el-input__wrapper {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+    
+    .el-input__inner {
+      color: var(--text-primary);
+      background-color: var(--bg-secondary);
+    }
+  }
+  
+  // 按钮组件
+  .el-button {
+    &.el-button--default {
+      background-color: var(--bg-secondary);
+      border-color: var(--border-color);
+      color: var(--text-primary);
+      
+      &:hover,
+      &:focus {
+        background-color: var(--bg-tertiary);
+      }
+    }
+  }
+  
+  // 对话框组件
+  .el-dialog {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+    
+    .el-dialog__title {
+      color: var(--text-primary);
+    }
+    
+    .el-dialog__header {
+      border-bottom-color: var(--border-color);
+    }
+  }
+  
+  // 表单组件
+  .el-form-item__label {
+    color: var(--text-primary);
+  }
 }
 
 // 全局工具类

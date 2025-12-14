@@ -37,7 +37,34 @@ class ConfigService:
             else:
                 # 否则使用全局函数
                 self.db = get_mongo_db()
+            # 确保索引已创建
+            await self._ensure_indexes()
         return self.db
+    
+    async def _ensure_indexes(self):
+        """确保索引已创建"""
+        db = self.db
+        if not db:
+            return
+        
+        # system_configs 集合索引
+        config_collection = db.system_configs
+        await config_collection.create_index([("is_active", 1), ("version", -1)], name="idx_is_active_version_desc")
+        await config_collection.create_index([("version", -1)], name="idx_version_desc")
+        await config_collection.create_index([("updated_at", -1)], name="idx_updated_at_desc")
+        await config_collection.create_index([("config_type", 1)], name="idx_config_type")
+        
+        # market_categories 集合索引
+        categories_collection = db.market_categories
+        await categories_collection.create_index([("id", 1)], unique=True, name="idx_category_id_unique")
+        await categories_collection.create_index([("sort_order", 1)], name="idx_category_sort_order")
+        await categories_collection.create_index([("enabled", 1)], name="idx_category_enabled")
+        
+        # datasource_groupings 集合索引
+        groupings_collection = db.datasource_groupings
+        await groupings_collection.create_index([("data_source_name", 1), ("market_category_id", 1)], unique=True, name="idx_ds_grouping_unique")
+        await groupings_collection.create_index([("market_category_id", 1)], name="idx_ds_grouping_category")
+        await groupings_collection.create_index([("priority", 1)], name="idx_ds_grouping_priority")
 
     # ==================== 市场分类管理 ====================
 

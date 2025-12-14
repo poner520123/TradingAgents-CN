@@ -48,7 +48,7 @@ export const useAppStore = defineStore('app', {
     lastApiCheck: 0,
 
     sidebarCollapsed: useStorage('sidebar-collapsed', false).value || false,
-    sidebarWidth: useStorage('sidebar-width', 276).value || 276,
+    sidebarWidth: useStorage('sidebar-width', 193).value || 193,
 
     currentRoute: null,
 
@@ -133,7 +133,8 @@ export const useAppStore = defineStore('app', {
     // 应用主题
     applyTheme() {
       const isDark = this.isDarkTheme
-      document.documentElement.classList.toggle('dark', isDark)
+      // 使用data-theme属性来切换主题
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
       
       // 更新meta标签
       const themeColorMeta = document.querySelector('meta[name="theme-color"]')

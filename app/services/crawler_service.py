@@ -248,13 +248,51 @@ class CrawlerService:
         return '暂未分类'
 
     def _get_recent_workdays(self, days=3):
-        """Get date of recent workdays start."""
+        """Get date of recent workdays start.
+        
+        改进的交易日计算方法，考虑工作日和基本的节假日处理
+        """
         today = datetime.now()
         workdays = 0
         start_date = today
+        
+        # 基本节假日列表（可以扩展或从外部数据源获取）
+        # 示例：2025年主要节假日
+        holidays = {
+            (2025, 1, 1),  # 元旦
+            (2025, 1, 2),
+            (2025, 1, 3),
+            (2025, 1, 28),  # 春节
+            (2025, 1, 29),
+            (2025, 1, 30),
+            (2025, 1, 31),
+            (2025, 2, 1),
+            (2025, 2, 2),
+            (2025, 4, 28),  # 劳动节
+            (2025, 4, 29),
+            (2025, 4, 30),
+            (2025, 5, 1),
+            (2025, 5, 2),
+            (2025, 5, 27),  # 端午节
+            (2025, 5, 28),
+            (2025, 5, 29),
+            (2025, 9, 29),  # 中秋节
+            (2025, 9, 30),
+            (2025, 10, 1),  # 国庆节
+            (2025, 10, 2),
+            (2025, 10, 3),
+            (2025, 10, 4),
+            (2025, 10, 5),
+            (2025, 10, 6),
+            (2025, 10, 7)
+        }
+        
         while workdays < days:
             start_date -= timedelta(days=1)
-            if start_date.weekday() < 5:
+            # 检查是否是工作日且不是节假日
+            is_weekday = start_date.weekday() < 5  # 0-4表示周一到周五
+            is_holiday = (start_date.year, start_date.month, start_date.day) in holidays
+            if is_weekday and not is_holiday:
                 workdays += 1
         return start_date
 
@@ -450,7 +488,7 @@ class CrawlerService:
 
     def crawl_pages(self, start_page, end_page, force=False):
         """Crawl pages with enhanced thread stability."""
-        # Logic similar to original but with enhanced error handling
+        # Logic similar to original but with enhanced error handling and smart page adjustment
         total_saved = 0
         from app.routers.websocket_notifications import send_notification_via_websocket
         import asyncio
@@ -459,20 +497,53 @@ class CrawlerService:
         asyncio.set_event_loop(loop)
         
         try:
-            # 获取最近3个工作日的起始日期
-            start_date = self._get_recent_workdays(3)
             # 记录已获取的日期范围
             collected_dates = set()
             # 初始爬取页面范围
+            current_start_page = start_page
             current_end_page = end_page
             # 标记是否已经覆盖了最近3个工作日
             has_covered_recent_workdays = False
+            # 最大爬取页面数，防止无限循环
+            MAX_PAGES = 200
+            total_pages_crawled = 0
             
-            while not has_covered_recent_workdays:
-                logger.info(f"🔍 开始爬取页面 {start_page}-{current_end_page}，目标覆盖最近3个工作日")
+            # 获取最近3个工作日的日期集合
+            recent_workdays = set()
+            today = datetime.now().date()
+            workdays = 0
+            current_date = today
+            while workdays < 3:
+                # 使用改进的交易日判断，考虑节假日
+                is_weekday = current_date.weekday() < 5  # 0-4 表示周一到周五
+                # 检查是否是节假日（使用_get_recent_workdays中的节假日列表）
+                holidays = {
+                    (2025, 1, 1), (2025, 1, 2), (2025, 1, 3),
+                    (2025, 1, 28), (2025, 1, 29), (2025, 1, 30), (2025, 1, 31), (2025, 2, 1), (2025, 2, 2),
+                    (2025, 4, 28), (2025, 4, 29), (2025, 4, 30), (2025, 5, 1), (2025, 5, 2),
+                    (2025, 5, 27), (2025, 5, 28), (2025, 5, 29),
+                    (2025, 9, 29), (2025, 9, 30),
+                    (2025, 10, 1), (2025, 10, 2), (2025, 10, 3), (2025, 10, 4), (2025, 10, 5), (2025, 10, 6), (2025, 10, 7)
+                }
+                is_holiday = (current_date.year, current_date.month, current_date.day) in holidays
                 
-                for page in range(start_page, current_end_page + 1):
+                if is_weekday and not is_holiday:
+                    recent_workdays.add(current_date)
+                    workdays += 1
+                current_date -= timedelta(days=1)
+            
+            logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
+            
+            while not has_covered_recent_workdays and total_pages_crawled < MAX_PAGES:
+                logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
+                
+                for page in range(current_start_page, current_end_page + 1):
+                    if total_pages_crawled >= MAX_PAGES:
+                        logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，停止爬取")
+                        break
+                        
                     try:
+                        total_pages_crawled += 1
                         # 发送开始爬取某页的通知
                         msg = f"正在爬取第 {page} 页..."
                         logger.info(msg)
@@ -484,8 +555,10 @@ class CrawlerService:
                             "data": {
                                 "status": "crawling", 
                                 "page": page, 
-                                "total_pages": current_end_page - start_page + 1,
-                                "current_step": page - start_page + 1
+                                "total_pages": current_end_page - current_start_page + 1,
+                                "current_step": page - current_start_page + 1,
+                                "max_pages": MAX_PAGES,
+                                "total_pages_crawled": total_pages_crawled
                             },
                             "source": "crawler",
                             "created_at": datetime.utcnow().isoformat()
@@ -511,7 +584,8 @@ class CrawlerService:
                                             "data": {
                                                 "status": "saved", 
                                                 "page": page, 
-                                                "saved_count": saved
+                                                "saved_count": saved,
+                                                "total_saved": total_saved
                                             },
                                             "source": "crawler",
                                             "created_at": datetime.utcnow().isoformat()
@@ -534,6 +608,12 @@ class CrawlerService:
                                             except ValueError:
                                                 continue
                                         
+                                        # 每次获取新数据后，立即检查是否已经覆盖了最近3个工作日
+                                        if recent_workdays.issubset(collected_dates):
+                                            has_covered_recent_workdays = True
+                                            logger.info("✅ 已成功覆盖最近3个工作日的数据，提前结束爬取")
+                                            break
+                                            
                                         delay = get_random_delay("success")
                                     except Exception as e:
                                         logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
@@ -569,43 +649,48 @@ class CrawlerService:
                         self._reset_session()
                         continue
                 
-                # 检查是否已经覆盖了最近3个工作日
-                # 生成最近3个工作日的日期集合
-                recent_workdays = set()
-                today = datetime.now().date()
-                workdays = 0
-                current_date = today
-                while workdays < 3:
-                    if current_date.weekday() < 5:  # 0-4 表示周一到周五
-                        recent_workdays.add(current_date)
-                        workdays += 1
-                    current_date -= timedelta(days=1)
-                
-                logger.info(f"📅 已收集的日期: {sorted(collected_dates)}")
-                logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
-                
-                # 检查是否已经覆盖了所有最近3个工作日
+                # 如果已经覆盖了最近3个工作日，跳出循环
                 if recent_workdays.issubset(collected_dates):
                     has_covered_recent_workdays = True
                     logger.info("✅ 已成功覆盖最近3个工作日的数据")
+                    break
+                
+                # 检查是否已经爬取了足够多的页面但仍未覆盖所有最近3个工作日
+                if total_pages_crawled >= MAX_PAGES:
+                    logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，但仍未覆盖所有最近3个工作日")
+                    break
+                    
+                # 智能调整下一轮爬取的页面范围
+                # 如果当前轮次没有获取到新数据，增加页面步长
+                pages_in_current_round = current_end_page - current_start_page + 1
+                if len(collected_dates) == 0:
+                    # 没有获取到任何数据，大幅增加爬取页面数
+                    current_start_page = current_end_page + 1
+                    current_end_page = current_start_page + pages_in_current_round * 2
+                    logger.info(f"⚠️ 未获取到任何数据，大幅增加爬取页面数。新的爬取范围: {current_start_page}-{current_end_page}")
                 else:
-                    # 如果没有覆盖，增加爬取页数，翻倍
-                    start_page = current_end_page + 1
-                    current_end_page *= 2
-                    logger.info(f"⚠️ 未覆盖所有最近3个工作日，继续爬取更多页面。新的爬取范围: {start_page}-{current_end_page}")
+                    # 获取到了部分数据，适当增加爬取页面数
+                    current_start_page = current_end_page + 1
+                    current_end_page = current_start_page + pages_in_current_round
+                    logger.info(f"⚠️ 已获取到部分数据，适当增加爬取页面数。新的爬取范围: {current_start_page}-{current_end_page}")
             
-            logger.info(f"✅ Crawl completed: Saved {total_saved} new records from pages {start_page}-{current_end_page}")
+            logger.info(f"📅 最终收集的日期: {sorted(collected_dates)}")
+            
+            if recent_workdays.issubset(collected_dates):
+                logger.info("✅ 成功覆盖所有最近3个工作日的数据")
+            else:
+                missing_days = recent_workdays - collected_dates
+                logger.warning(f"⚠️ 未能覆盖所有最近3个工作日的数据，缺少: {sorted(missing_days)}")
+                
+            logger.info(f"✅ Crawl completed: Saved {total_saved} new records from {total_pages_crawled} pages")
             
             # 通过 WebSocket 发送通知给前端，让前端刷新数据
             try:
-                from app.routers.websocket_notifications import send_notification_via_websocket
-                import asyncio
-                
                 # 发送爬虫完成通知
                 notification = {
                     "id": f"crawler-{int(time.time())}",
                     "title": "爬虫完成",
-                    "content": f"成功爬取 {total_saved} 条新数据",
+                    "content": f"成功爬取 {total_saved} 条新数据，共爬取 {total_pages_crawled} 页",
                     "type": "crawler",
                     "link": "/analysis/crawler",
                     "source": "crawler",
@@ -613,10 +698,7 @@ class CrawlerService:
                     "status": "unread"
                 }
                 
-                # 使用异步方式发送通知
-                # loop = asyncio.get_event_loop() # loop already exists
                 loop.run_until_complete(send_notification_via_websocket("admin", notification))
-                
                 logger.info("📤 WebSocket 通知发送成功")
             except Exception as e:
                 logger.error(f"❌ 发送 WebSocket 通知失败: {type(e).__name__}: {str(e)}")

@@ -1,22 +1,42 @@
-# Frontend Dockerfile for Vue 3 + Vite app (TradingAgents-CN v1.0.0-preview)
+# Frontend Dockerfile for Vue 3 + Vite app (TA v1.0.0-preview)
 # 前后端分离架构 - 前端服务
 
-# 运行阶段：使用Nginx提供静态文件服务
+# 多阶段构建：构建阶段
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 复制package.json和package-lock.json
+COPY frontend/package*.json ./frontend/
+
+# 安装依赖
+RUN cd frontend && npm install --registry=https://registry.npmmirror.com
+
+# 复制前端源码和docs目录
+COPY frontend/ ./frontend/
+COPY docs/ ./docs/
+
+# 构建生产版本
+RUN cd frontend && npm run build
+
+# 多阶段构建：运行阶段
 FROM nginx:alpine AS runtime
 
 WORKDIR /usr/share/nginx/html
 
-# 复制本地构建好的dist目录到容器
-COPY frontend/dist .
+# 复制构建产物
+COPY --from=builder /app/frontend/dist .
 
-# 复制根目录的静态资源与文档
-COPY assets /usr/share/nginx/html/assets
-COPY docs /app/docs
-
-# 复制Nginx主配置文件（修改日志级别为error，过滤notice日志）
+# 复制Nginx配置文件
 COPY docker/nginx.global.conf /etc/nginx/nginx.conf
-# 复制Nginx站点配置（支持SPA路由）
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# 清理不必要的文件
+RUN rm -rf /usr/share/nginx/html/assets/fonts/* \
+    && rm -rf /usr/share/nginx/html/assets/icons/*.png \
+    && rm -rf /usr/share/nginx/html/assets/images/*.png \
+    && rm -rf /usr/share/nginx/html/assets/images/*.jpg \
+    && rm -rf /usr/share/nginx/html/assets/images/*.gif
 
 # 暴露端口80
 EXPOSE 80

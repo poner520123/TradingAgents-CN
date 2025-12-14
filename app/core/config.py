@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     MONGODB_PORT: int = Field(default=27017)
     MONGODB_USERNAME: str = Field(default="")
     MONGODB_PASSWORD: str = Field(default="")
-    MONGODB_DATABASE: str = Field(default="tradingagents")
+    MONGODB_DATABASE: str = Field(default="ta")
     MONGODB_AUTH_SOURCE: str = Field(default="admin")
     MONGO_MAX_CONNECTIONS: int = Field(default=100)
     MONGO_MIN_CONNECTIONS: int = Field(default=10)
@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     DEFAULT_USER_CONCURRENT_LIMIT: int = Field(default=3)
     GLOBAL_CONCURRENT_LIMIT: int = Field(default=50)
     DEFAULT_DAILY_QUOTA: int = Field(default=1000)
+    
+    # 分析任务线程池配置
+    ANALYSIS_THREAD_POOL_SIZE: int = Field(default=3, ge=1, le=20, description="分析任务线程池大小")
+    # ANALYSIS_THREAD_POOL_MAX_TASKS_PER_WORKER 已移除，因为 ThreadPoolExecutor 不支持此参数
+    # ANALYSIS_THREAD_POOL_MAX_TASKS_PER_WORKER: int = Field(default=100, description="每个工作线程最多执行的任务数")
 
     # 速率限制
     RATE_LIMIT_ENABLED: bool = Field(default=True)
@@ -99,7 +104,7 @@ class Settings(BaseSettings):
     # 日志配置
     LOG_LEVEL: str = Field(default="INFO")
     LOG_FORMAT: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    LOG_FILE: str = Field(default="logs/tradingagents.log")
+    LOG_FILE: str = Field(default="logs/ta.log")
 
     # 代理配置
     # 用于配置需要绕过代理的域名（国内数据源）
@@ -251,7 +256,7 @@ class Settings(BaseSettings):
     BAOSTOCK_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化数据")
 
     # 数据目录配置
-    TRADINGAGENTS_DATA_DIR: str = Field(default="./data")
+    TA_DATA_DIR: str = Field(default="./data")
 
     @property
     def log_dir(self) -> str:

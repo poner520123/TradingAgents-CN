@@ -6,7 +6,6 @@
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
->
 > 🎓 **学习中心**: AI基础 | 提示词工程 | 模型选择 | 多智能体分析原理 | 风险与局限 | 源项目与论文 | 实战教程（部分为外链） | 常见问题
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -25,12 +24,14 @@
 ### ✨ 核心特性
 
 #### 🏗️ **全新技术架构**
+
 - **后端升级**: 从 Streamlit 迁移到 FastAPI，提供更强大的 RESTful API
 - **前端重构**: 采用 Vue 3 + Element Plus，打造现代化的单页应用
 - **数据库优化**: MongoDB + Redis 双数据库架构，性能提升 10 倍
 - **容器化部署**: 完整的 Docker 多架构支持（amd64 + arm64）
 
 #### 🎯 **企业级功能**
+
 - **用户权限管理**: 完整的用户认证、角色管理、操作日志系统
 - **配置管理中心**: 可视化的大模型配置、数据源管理、系统设置
 - **缓存管理系统**: 智能缓存策略，支持 MongoDB/Redis/文件多级缓存
@@ -42,53 +43,52 @@
 - **模拟交易系统**: 虚拟交易环境，验证投资策略效果
 
 #### 🤖 **智能分析增强**
+
 - **动态供应商管理**: 支持动态添加和配置 LLM 供应商
 - **模型能力管理**: 智能模型选择，根据任务自动匹配最佳模型
 - **多数据源同步**: 统一的数据源管理，支持 Tushare、AkShare、BaoStock
 - **报告导出功能**: 支持 Markdown/Word/PDF 多格式专业报告导出
 
 #### � **重大Bug修复**
+
 - **技术指标计算修复**: 彻底解决市场分析师技术指标计算不准确问题
 - **基本面数据修复**: 修复基本面分析师PE、PB等关键财务数据计算错误
 - **死循环问题修复**: 解决部分用户在分析过程中触发的无限循环问题
 - **数据一致性优化**: 确保所有分析师使用统一、准确的数据源
 
 #### �🐳 **Docker 多架构支持**
+
 - **跨平台部署**: 支持 x86_64 和 ARM64 架构（Apple Silicon、树莓派、AWS Graviton）
 - **GitHub Actions**: 自动化构建和发布 Docker 镜像
 - **一键部署**: 完整的 Docker Compose 配置，5 分钟快速启动
 
 ### 📊 技术栈升级
 
-| 组件 | v0.1.x | v1.0.0-preview |
-|------|--------|----------------|
-| **后端框架** | Streamlit | FastAPI + Uvicorn |
-| **前端框架** | Streamlit | Vue 3 + Vite + Element Plus |
-| **数据库** | 可选 MongoDB | MongoDB + Redis |
-| **API 架构** | 单体应用 | RESTful API + WebSocket |
-| **部署方式** | 本地/Docker | Docker 多架构 + GitHub Actions |
-
-
+| 组件               | v0.1.x       | v1.0.0-preview                 |
+| ------------------ | ------------ | ------------------------------ |
+| **后端框架** | Streamlit    | FastAPI + Uvicorn              |
+| **前端框架** | Streamlit    | Vue 3 + Vite + Element Plus    |
+| **数据库**   | 可选 MongoDB | MongoDB + Redis                |
+| **API 架构** | 单体应用     | RESTful API + WebSocket        |
+| **部署方式** | 本地/Docker  | Docker 多架构 + GitHub Actions |
 
 #### 📥 安装部署
 
 **三种部署方式，任选其一**：
 
-| 部署方式 | 适用场景 | 难度 | 文档链接 |
-|---------|---------|------|---------|
-| 🟢 **绿色版** | Windows 用户、快速体验 | ⭐ 简单 | [绿色版安装指南](https://mp.weixin.qq.com/s/eoo_HeIGxaQZVT76LBbRJQ) |
-| 🐳 **Docker版** | 生产环境、跨平台 | ⭐⭐ 中等 | [Docker 部署指南](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw) |
-| 💻 **本地代码版** | 开发者、定制需求 | ⭐⭐⭐ 较难 | [本地安装指南](https://mp.weixin.qq.com/s/cqUGf-sAzcBV19gdI4sYfA) |
+| 部署方式               | 适用场景               | 难度        | 文档链接                                                          |
+| ---------------------- | ---------------------- | ----------- | ----------------------------------------------------------------- |
+| 🟢**绿色版**     | Windows 用户、快速体验 | ⭐ 简单     | [绿色版安装指南](https://mp.weixin.qq.com/s/eoo_HeIGxaQZVT76LBbRJQ)  |
+| 🐳**Docker版**   | 生产环境、跨平台       | ⭐⭐ 中等   | [Docker 部署指南](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw) |
+| 💻**本地代码版** | 开发者、定制需求       | ⭐⭐⭐ 较难 | [本地安装指南](https://mp.weixin.qq.com/s/cqUGf-sAzcBV19gdI4sYfA)    |
 
 ⚠️ **重要提醒**：在分析股票之前，请按相关文档要求，将股票数据同步完成，否则分析结果将会出现数据错误。
-
-
 
 #### 📚 使用指南
 
 在使用前，建议先阅读详细的使用指南：
-- **[0、📘 TA v1.0.0-preview 快速入门视频](https://www.bilibili.com/video/BV1i2CeBwEP7/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
 
+- **[0、📘 TA v1.0.0-preview 快速入门视频](https://www.bilibili.com/video/BV1i2CeBwEP7/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
 - **[1、📘 TA v1.0.0-preview 使用指南](https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw)**
 - **[2、📘 使用 Docker Compose 部署TA v1.0.0-preview（完全版）](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw)**
 - **[3、📘 从 Docker Hub 更新 TradingAgents‑CN 镜像](https://mp.weixin.qq.com/s/WKYhW8J80Watpg8K6E_dSQ)**
@@ -97,8 +97,8 @@
 - **[6、📘 TradingAgents v1.0.0-preview 源码版安装手册（修订版）](https://mp.weixin.qq.com/s/cqUGf-sAzcBV19gdI4sYfA)**
 - **[7、📘 TradingAgents v1.0.0-preview 源码安装视频教程](https://www.bilibili.com/video/BV1FxCtBHEte/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
 
-
 使用指南包含：
+
 - ✅ 完整的功能介绍和操作演示
 - ✅ 详细的配置说明和最佳实践
 - ✅ 常见问题解答和故障排除
@@ -109,11 +109,9 @@
 1. **关注公众号**: 微信搜索 **"TA"** 并关注
 2. 公众号每天推送项目最新进展和使用教程
 
-
 - **微信公众号**: TA（推荐）
 
   <img src="assets/wexin.png" alt="微信公众号" width="200"/>
-
 
 ## 🆚 中文增强特色
 
@@ -147,11 +145,13 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 ### 🚀 如何加入？
 
 **方式一：微信公众号申请（推荐）**
+
 1. 关注微信公众号：**TradingAgentsCN**
 2. 在公众号菜单选择"测试申请"菜单
 3. 填写申请信息
 
 **方式二：邮件申请**
+
 - 发送邮件到：hsliup@163.com
 - 主题：测试志愿者申请
 
@@ -200,16 +200,19 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 本项目采用**混合许可证**模式，详见 [LICENSE](LICENSE) 文件：
 
 ### 🔓 开源部分（Apache 2.0）
+
 - **适用范围**：除 `app/` 和 `frontend/` 外的所有文件
 - **权限**：商业使用 ✅ | 修改分发 ✅ | 私人使用 ✅ | 专利使用 ✅
 - **条件**：保留版权声明 ❗ | 包含许可证副本 ❗
 
 ### 🔒 专有部分（需商业授权）
+
 - **适用范围**：`app/`（FastAPI后端）和 `frontend/`（Vue前端）目录
 - **商业使用**：需要单独许可协议
 - **联系授权**：[hsliup@163.com](mailto:hsliup@163.com)
 
 ### 📋 许可证选择建议
+
 - **个人学习/研究**：可自由使用全部功能
 - **商业应用**：请联系获取专有组件授权
 - **定制开发**：欢迎咨询商业合作方案
@@ -293,7 +296,6 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 - 项目微信公众号：TA
 
   <img src="assets/wexin.png" alt="微信公众号" width="200"/>
-
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
 - **文档**: [完整文档目录](docs/)
 
@@ -308,7 +310,165 @@ TradingAgentsCN 已经获得 **13,000+ stars**，但一直由我一个人开发�
 
 ---
 
-<div align="center">
+# 项目优化重构计划
+
+## 一、优化目标
+
+- 不影响现有功能和后端服务
+- 极致优化代码性能和可维护性
+- 移除冗余功能、页面和接口
+- 优化文件组织和代码结构
+
+## 二、优化范围
+
+### 1. 前端优化
+
+#### 1.1 移除冗余功能
+
+- [ ] 模拟交易功能：移除所有相关文件和API
+- [ ] 学习中心：根据实际需求评估是否保留
+- [ ] 美股/港股相关组件和逻辑：移除多市场支持，只保留A股
+- [ ] 未使用的系统管理功能：如日志管理、操作日志等
+
+#### 1.2 优化组件和页面
+
+- [ ] 简化 `MarketSelector`组件，只支持A股
+- [ ] 简化 `MultiMarketStockSearch`组件，只支持A股
+- [ ] 优化 `SidebarMenu`，移除冗余菜单项
+- [ ] 清理未使用的组件和页面
+- [ ] 合并重复组件，提高复用性
+
+#### 1.3 优化API和工具函数
+
+- [ ] 移除未使用的API文件
+- [ ] 简化 `market.ts`，只保留A股逻辑
+- [ ] 简化 `stockValidator.ts`，只支持A股代码
+- [ ] 移除 `paper.ts`相关API
+- [ ] 合并相似工具函数
+
+#### 1.4 优化路由配置
+
+- [ ] 移除未使用的路由
+- [ ] 优化路由结构，提高可读性
+- [ ] 实现路由懒加载，优化性能
+
+#### 1.5 优化状态管理
+
+- [ ] 清理未使用的状态
+- [ ] 优化状态更新逻辑
+- [ ] 减少不必要的状态监听
+
+#### 1.6 优化样式
+
+- [ ] 移除未使用的样式
+- [ ] 统一样式命名规范
+- [ ] 优化CSS选择器，提高性能
+
+### 2. 后端优化
+
+#### 2.1 移除冗余API
+
+- [ ] 移除模拟交易相关API
+- [ ] 移除美股/港股相关API
+- [ ] 移除未使用的爬虫相关API
+- [ ] 移除未使用的定时任务API
+
+#### 2.2 优化代码结构
+
+- [ ] 合并重复代码
+- [ ] 优化文件组织
+- [ ] 提高代码可读性
+
+#### 2.3 优化性能
+
+- [ ] 优化数据库查询
+- [ ] 优化API响应时间
+- [ ] 实现合理的缓存策略
+
+## 三、具体优化步骤
+
+### 1. 移除模拟交易功能
+
+- 删除 `frontend/src/views/PaperTrading`目录
+- 删除 `frontend/src/api/paper.ts`
+- 清理路由配置中的模拟交易路由
+- 清理菜单中的模拟交易菜单项
+
+### 2. 移除多市场支持
+
+- 简化 `frontend/src/components/Global/MarketSelector.vue`，只显示A股
+- 简化 `frontend/src/components/Global/MultiMarketStockSearch.vue`，只支持A股搜索
+- 简化 `frontend/src/utils/market.ts`，只返回A股
+- 简化 `frontend/src/utils/stockValidator.ts`，只支持A股代码
+- 清理 `frontend/src/api/multiMarket.ts`中的多市场逻辑
+
+### 3. 优化API文件
+
+- 删除未使用的API文件：如 `frontend/src/api/crawler.ts`、`frontend/src/api/templates.ts`等
+- 合并相关API文件，减少文件数量
+- 优化API请求逻辑，减少不必要的请求
+
+### 4. 优化组件和页面
+
+- 删除未使用的组件：如 `frontend/src/components/Dev/DevPanel.vue`
+- 简化 `frontend/src/components/Layout/SidebarMenu.vue`，移除冗余菜单项
+- 优化 `frontend/src/views/Analysis/SingleAnalysis.vue`，简化市场选择逻辑
+
+### 5. 优化工具函数
+
+- 合并相似工具函数
+- 移除未使用的工具函数
+- 优化工具函数性能
+
+### 6. 优化路由配置
+
+- 移除未使用的路由
+- 实现路由懒加载
+- 优化路由结构
+
+### 7. 优化状态管理
+
+- 清理未使用的状态
+- 优化状态更新逻辑
+- 减少不必要的状态监听
+
+### 8. 优化样式
+
+- 移除未使用的样式
+- 统一样式命名规范
+- 优化CSS选择器
+
+### 9. 后端API优化
+
+- 删除未使用的API路由
+- 优化数据库查询
+- 实现合理的缓存策略
+
+## 四、优化验证
+
+1. **功能验证**：确保所有核心功能正常工作
+2. **性能验证**：测试页面加载速度和API响应时间
+3. **代码质量验证**：检查代码质量和可维护性
+4. **安全验证**：确保优化后没有引入安全问题
+
+## 五、预期效果
+
+- 代码更简洁、可维护性更高
+- 页面加载速度更快
+- API响应时间更短
+- 减少不必要的资源消耗
+- 提高代码复用性
+- 优化开发体验
+
+## 六、实施原则
+
+1. **渐进式优化**：逐步优化，避免大规模修改
+2. **测试驱动**：每一步优化都要经过测试
+3. **向后兼容**：确保优化后不影响现有功能
+4. **文档同步**：更新相关文档
+5. **代码审查**：确保代码质量
+
+通过以上优化重构，项目将变得更加精简、高效和可维护，同时不影响现有功能和后端服务。
 
 **🌟 如果这个项目对您有帮助，请给我们一个 Star！**
 
