@@ -64,6 +64,7 @@ from app.routers.multi_market_stocks import router as multi_market_stocks_router
 from app.routers.notifications import router as notifications_router
 from app.routers.websocket_notifications import router as websocket_notifications_router
 from app.routers.scheduler import router as scheduler_router
+from app.routers.astock import router as astock_router
 
 # Alias for backward compatibility
 auth = auth_router
@@ -99,6 +100,7 @@ from app.worker.baostock_sync_service import (
 # from app.worker.hk_sync_service import ...
 # from app.worker.us_sync_service import ...
 from app.middleware.operation_log_middleware import OperationLogMiddleware
+import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -349,6 +351,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         croniter = None  # 可选依赖
     try:
+        import asyncio
         scheduler = AsyncIOScheduler(timezone=settings.TIMEZONE)
 
         # 使用多数据源同步服务（支持自动切换）
@@ -653,6 +656,32 @@ async def lifespan(app: FastAPI):
         )
         logger.info("✅ 自动爬虫任务已配置: 每5分钟执行一次")
 
+        # ==================== Scrapy爬虫任务配置 ====================
+        logger.info("🔄 配置Scrapy爬虫定时任务...")
+
+        from app.services.scrapy_crawler_service import ScrapyCrawlerService
+
+        async def run_scrapy_crawlers():
+            """运行Scrapy爬虫任务 - 每10分钟自动执行"""
+            try:
+                logger.info("🕷️ 开始自动Scrapy爬虫任务...")
+                scrapy_service = ScrapyCrawlerService()
+                # 运行所有Scrapy爬虫
+                total_saved = scrapy_service.run_all_crawlers()
+                logger.info(f"✅ 自动Scrapy爬虫任务完成: 保存了 {total_saved} 条新数据")
+            except Exception as e:
+                logger.error(f"❌ 自动Scrapy爬虫任务失败: {e}", exc_info=True)
+
+        # 配置Scrapy爬虫定时任务，每10分钟执行一次
+        scheduler.add_job(
+            run_scrapy_crawlers,
+            IntervalTrigger(minutes=10, timezone=settings.TIMEZONE),
+            id="scrapy_crawler_task",
+            name="自动Scrapy爬虫任务",
+            replace_existing=True
+        )
+        logger.info("✅ 自动Scrapy爬虫任务已配置: 每10分钟执行一次")
+
         # ==================== 港股/美股数据配置 ====================
         # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
         logger.info("🇭🇰 港股数据采用按需获取+缓存模式")
@@ -671,6 +700,11 @@ async def lifespan(app: FastAPI):
             logger.info(f"📰 新闻数据同步已配置（仅自选股）: {settings.NEWS_SYNC_CRON}")
 
         scheduler.start()
+
+        # 立即执行一次Scrapy爬虫任务，而不是等待10分钟
+        logger.info("🚀 立即执行初始Scrapy爬虫任务...")
+        import asyncio
+        asyncio.create_task(run_scrapy_crawlers())
 
         # 设置调度器实例到服务中，以便API可以管理任务
         set_scheduler_instance(scheduler)
@@ -843,6 +877,9 @@ app.include_router(internal_messages_router, tags=["internal-messages"])
 
 # 爬虫路由
 app.include_router(crawler_router, prefix="/api", tags=["crawler"])
+
+# astock路由
+app.include_router(astock_router, prefix="/api", tags=["astock"])
 
 # 股票名称代码映射路由
 app.include_router(stock_map_router, prefix="/api", tags=["stock-map"])

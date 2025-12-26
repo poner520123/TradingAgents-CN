@@ -81,6 +81,33 @@ const routes: RouteRecordRaw[] = [
           requiresAuth: true
         }
       },
+      {
+        path: 'popularity',
+        name: 'PopularityRanking',
+        component: () => import('@/views/Analysis/PopularityRanking.vue'),
+        meta: {
+          title: '人气排行榜',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'capital-flow',
+        name: 'CapitalFlowRanking',
+        component: () => import('@/views/Analysis/CapitalFlowRanking.vue'),
+        meta: {
+          title: '资金流向排行榜',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'cross-analysis',
+        name: 'CrossAnalysis',
+        component: () => import('@/views/Analysis/CrossAnalysis.vue'),
+        meta: {
+          title: '交叉分析',
+          requiresAuth: true
+        }
+      },
 
     ]
   },

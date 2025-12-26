@@ -5,6 +5,16 @@ from pathlib import Path
 import os
 import platform
 
+# 确保所有输出使用UTF-8编码
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+else:
+    # 兼容Python 3.6及以下版本
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+
 from app.core.logging_context import LoggingContextFilter, trace_id_var
 
 # 🔥 在 Windows 上使用 concurrent-log-handler 避免文件占用问题
@@ -49,7 +59,7 @@ class SimpleJsonFormatter(logging.Formatter):
             "trace_id": getattr(record, "trace_id", "-"),
             "message": record.getMessage(),
         }
-        return json.dumps(obj, ensure_ascii=False)
+        return json.dumps(obj, ensure_ascii=False, encoding="utf-8")
 
 
 def _parse_size(size_str: str) -> int:

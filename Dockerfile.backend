@@ -37,9 +37,10 @@ COPY pyproject.toml README.md ./
 # 2. 优先使用预编译的二进制wheel包（--prefer-binary）
 # 3. 避免从源码编译，大幅提升ARM架构构建速度
 # 4. 安装 PDF 导出工具: pdfkit
+# 5. 安装 Scrapy 爬虫框架
 RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install --prefer-binary . -i https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip install --prefer-binary pdfkit -i https://pypi.tuna.tsinghua.edu.cn/simple
+    pip install --prefer-binary pdfkit scrapy -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 多阶段构建：运行阶段
 FROM python:3.10-slim-bookworm
@@ -54,14 +55,16 @@ WORKDIR /app
 # 创建必需的目录
 RUN mkdir -p /app/logs /app/data /app/config /app/scripts
 
-# 安装运行时依赖
+# 安装运行时依赖和中文语言支持
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         fontconfig \
         libfontconfig1 \
-        wget && \
+        wget \
+        locales \
+        locales-all && \
     rm -rf /var/lib/apt/lists/*
 
 # 从构建阶段复制Python依赖
@@ -76,6 +79,7 @@ COPY scripts/setup ./scripts/setup
 COPY scripts/user_password_manager.py ./scripts/
 COPY scripts/mongo-init.js ./scripts/
 COPY docs/fjzt_a.csv ./docs/
+COPY app/scrapy_project ./app/scrapy_project
 
 # 复制Docker环境配置文件
 COPY .env.docker ./.env

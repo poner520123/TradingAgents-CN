@@ -28,6 +28,10 @@ services:
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
       TZ: "Asia/Shanghai"
+      # 编码配置，解决日志乱码问题
+      LC_ALL: "en_US.UTF-8"
+      LANG: "en_US.UTF-8"
+      LANGUAGE: "en_US:en"
       # 日志配置
       TA_LOG_LEVEL: "INFO"
       TA_LOG_DIR: "/app/logs"
