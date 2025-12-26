@@ -67,8 +67,8 @@ const router = useRouter()
 
 // 配置项
 const REFRESH_INTERVAL = 5 * 60 * 1000 // 5分钟
-const MAX_STOCKS = 100 // 从最新100条中选择
-const DISPLAY_COUNT = 15 // 显示15条
+const MAX_STOCKS = 50 // 从最新50条中选择
+const DISPLAY_COUNT = 10 // 显示10条
 
 // 响应式数据
 const loading = ref(true)
@@ -104,22 +104,38 @@ const loadCrawlerData = async () => {
     const response = await getCrawlerData(1, MAX_STOCKS)
     
     if (response.success && response.data) {
-      allStocks.value = response.data
+      let stocks = response.data
       // 按时间倒序排序（最新的在前）
-      allStocks.value.sort((a, b) => {
+      stocks.sort((a, b) => {
         const timeA = new Date(a.crawled_at || a.time).getTime()
         const timeB = new Date(b.crawled_at || b.time).getTime()
         return timeB - timeA
       })
       
-      // 随机选择15个股票
-      const selected = getRandomElements(allStocks.value, DISPLAY_COUNT)
+      // 去重逻辑：根据股票代码或股票名称去重
+      const uniqueStocks = new Map<string, CrawlerData>()
+      for (const stock of stocks) {
+        // 使用股票代码作为主键，如果没有则使用股票名称
+        const key = stock.stock_code || stock.stock_name
+        if (key && !uniqueStocks.has(key)) {
+          uniqueStocks.set(key, stock)
+        }
+      }
+      
+      // 将Map转换为数组
+      const uniqueStocksArray = Array.from(uniqueStocks.values())
+      
+      // 随机选择DISPLAY_COUNT个股票
+      const selected = getRandomElements(uniqueStocksArray, DISPLAY_COUNT)
       // 然后按时间倒序排序，确保显示时从左到右从上到下时间由近到远排列
       randomStocks.value = selected.sort((a, b) => {
         const timeA = new Date(a.crawled_at || a.time).getTime()
         const timeB = new Date(b.crawled_at || b.time).getTime()
         return timeB - timeA
       })
+      
+      // 更新allStocks为去重后的数据
+      allStocks.value = uniqueStocksArray
     }
   } catch (error) {
     console.error('加载爬虫数据失败:', error)

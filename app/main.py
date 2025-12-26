@@ -627,6 +627,32 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"❌ 新闻同步失败: {e}", exc_info=True)
 
+        # ==================== 爬虫任务配置 ====================
+        logger.info("🔄 配置爬虫定时任务...")
+
+        from app.services.crawler_service import CrawlerService
+
+        async def run_crawler_task():
+            """运行爬虫任务 - 每5分钟自动执行"""
+            try:
+                logger.info("🕷️ 开始自动爬虫任务...")
+                crawler_service = CrawlerService()
+                # 爬取1-20页数据
+                total_saved = crawler_service.crawl_pages(1, 20)
+                logger.info(f"✅ 自动爬虫任务完成: 保存了 {total_saved} 条新数据")
+            except Exception as e:
+                logger.error(f"❌ 自动爬虫任务失败: {e}", exc_info=True)
+
+        # 配置爬虫定时任务，每5分钟执行一次
+        scheduler.add_job(
+            run_crawler_task,
+            IntervalTrigger(minutes=5, timezone=settings.TIMEZONE),
+            id="crawler_task",
+            name="自动爬虫任务",
+            replace_existing=True
+        )
+        logger.info("✅ 自动爬虫任务已配置: 每5分钟执行一次")
+
         # ==================== 港股/美股数据配置 ====================
         # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
         logger.info("🇭🇰 港股数据采用按需获取+缓存模式")
