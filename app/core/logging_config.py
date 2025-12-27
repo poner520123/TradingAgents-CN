@@ -59,7 +59,7 @@ class SimpleJsonFormatter(logging.Formatter):
             "trace_id": getattr(record, "trace_id", "-"),
             "message": record.getMessage(),
         }
-        return json.dumps(obj, ensure_ascii=False, encoding="utf-8")
+        return json.dumps(obj, ensure_ascii=False)
 
 
 def _parse_size(size_str: str) -> int:

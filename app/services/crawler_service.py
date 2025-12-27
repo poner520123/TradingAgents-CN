@@ -493,161 +493,135 @@ class CrawlerService:
         from app.routers.websocket_notifications import send_notification_via_websocket
         import asyncio
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # 记录已获取的日期范围
+        collected_dates = set()
+        # 初始爬取页面范围
+        current_start_page = start_page
+        current_end_page = end_page
+        # 标记是否已经覆盖了最近3个工作日
+        has_covered_recent_workdays = False
+        # 最大爬取页面数，防止无限循环
+        MAX_PAGES = 200
+        total_pages_crawled = 0
         
-        try:
-            # 记录已获取的日期范围
-            collected_dates = set()
-            # 初始爬取页面范围
-            current_start_page = start_page
-            current_end_page = end_page
-            # 标记是否已经覆盖了最近3个工作日
-            has_covered_recent_workdays = False
-            # 最大爬取页面数，防止无限循环
-            MAX_PAGES = 200
-            total_pages_crawled = 0
+        # 获取最近3个工作日的日期集合
+        recent_workdays = set()
+        today = datetime.now().date()
+        workdays = 0
+        current_date = today
+        while workdays < 3:
+            # 使用改进的交易日判断，考虑节假日
+            is_weekday = current_date.weekday() < 5  # 0-4 表示周一到周五
+            # 检查是否是节假日（使用_get_recent_workdays中的节假日列表）
+            holidays = {
+                (2025, 1, 1), (2025, 1, 2), (2025, 1, 3),
+                (2025, 1, 28), (2025, 1, 29), (2025, 1, 30), (2025, 1, 31), (2025, 2, 1), (2025, 2, 2),
+                (2025, 4, 28), (2025, 4, 29), (2025, 4, 30), (2025, 5, 1), (2025, 5, 2),
+                (2025, 5, 27), (2025, 5, 28), (2025, 5, 29),
+                (2025, 9, 29), (2025, 9, 30),
+                (2025, 10, 1), (2025, 10, 2), (2025, 10, 3), (2025, 10, 4), (2025, 10, 5), (2025, 10, 6), (2025, 10, 7)
+            }
+            is_holiday = (current_date.year, current_date.month, current_date.day) in holidays
             
-            # 获取最近3个工作日的日期集合
-            recent_workdays = set()
-            today = datetime.now().date()
-            workdays = 0
-            current_date = today
-            while workdays < 3:
-                # 使用改进的交易日判断，考虑节假日
-                is_weekday = current_date.weekday() < 5  # 0-4 表示周一到周五
-                # 检查是否是节假日（使用_get_recent_workdays中的节假日列表）
-                holidays = {
-                    (2025, 1, 1), (2025, 1, 2), (2025, 1, 3),
-                    (2025, 1, 28), (2025, 1, 29), (2025, 1, 30), (2025, 1, 31), (2025, 2, 1), (2025, 2, 2),
-                    (2025, 4, 28), (2025, 4, 29), (2025, 4, 30), (2025, 5, 1), (2025, 5, 2),
-                    (2025, 5, 27), (2025, 5, 28), (2025, 5, 29),
-                    (2025, 9, 29), (2025, 9, 30),
-                    (2025, 10, 1), (2025, 10, 2), (2025, 10, 3), (2025, 10, 4), (2025, 10, 5), (2025, 10, 6), (2025, 10, 7)
-                }
-                is_holiday = (current_date.year, current_date.month, current_date.day) in holidays
+            if is_weekday and not is_holiday:
+                recent_workdays.add(current_date)
+                workdays += 1
+            current_date -= timedelta(days=1)
+        
+        logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
+        
+        while not has_covered_recent_workdays and total_pages_crawled < MAX_PAGES:
+            logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
+            
+            for page in range(current_start_page, current_end_page + 1):
+                if total_pages_crawled >= MAX_PAGES:
+                    logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，停止爬取")
+                    break
+                    
+                total_pages_crawled += 1
+                # 发送开始爬取某页的通知
+                msg = f"正在爬取第 {page} 页..."
+                logger.info(msg)
                 
-                if is_weekday and not is_holiday:
-                    recent_workdays.add(current_date)
-                    workdays += 1
-                current_date -= timedelta(days=1)
-            
-            logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
-            
-            while not has_covered_recent_workdays and total_pages_crawled < MAX_PAGES:
-                logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
+                # 不使用WebSocket通知，避免事件循环冲突
+                # 直接记录日志即可
                 
-                for page in range(current_start_page, current_end_page + 1):
-                    if total_pages_crawled >= MAX_PAGES:
-                        logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，停止爬取")
-                        break
-                        
+                html = self.fetch_page(page)
+                if html:
                     try:
-                        total_pages_crawled += 1
-                        # 发送开始爬取某页的通知
-                        msg = f"正在爬取第 {page} 页..."
-                        logger.info(msg)
-                        loop.run_until_complete(send_notification_via_websocket("admin", {
-                            "id": f"crawler-p{page}-start-{int(time.time())}",
-                            "title": "爬虫进度",
-                            "content": msg,
-                            "type": "progress", # 新类型：progress
-                            "data": {
-                                "status": "crawling", 
-                                "page": page, 
-                                "total_pages": current_end_page - current_start_page + 1,
-                                "current_step": page - current_start_page + 1,
-                                "max_pages": MAX_PAGES,
-                                "total_pages_crawled": total_pages_crawled
-                            },
-                            "source": "crawler",
-                            "created_at": datetime.utcnow().isoformat()
-                        }))
-
-                        html = self.fetch_page(page)
-                        if html:
+                        data = self.parse_html(html)
+                        if data:
                             try:
-                                data = self.parse_html(html)
-                                if data:
+                                saved = self.save_data(data)
+                                total_saved += saved
+                                msg = f"第 {page} 页: 成功保存 {saved} 条新数据"
+                                logger.info(msg)
+                                
+                                # 不使用WebSocket通知，避免事件循环冲突
+                                # 直接记录日志即可
+                                
+                                # 收集已获取数据的日期
+                                for item in data:
+                                    time_str = item['time']
                                     try:
-                                        saved = self.save_data(data)
-                                        total_saved += saved
-                                        msg = f"第 {page} 页: 成功保存 {saved} 条新数据"
-                                        logger.info(msg)
-                                        
-                                        # 发送保存成功通知
-                                        loop.run_until_complete(send_notification_via_websocket("admin", {
-                                            "id": f"crawler-p{page}-saved-{int(time.time())}",
-                                            "title": "爬虫进度",
-                                            "content": msg,
-                                            "type": "progress",
-                                            "data": {
-                                                "status": "saved", 
-                                                "page": page, 
-                                                "saved_count": saved,
-                                                "total_saved": total_saved
-                                            },
-                                            "source": "crawler",
-                                            "created_at": datetime.utcnow().isoformat()
-                                        }))
-                                        
-                                        # 收集已获取数据的日期
-                                        for item in data:
-                                            time_str = item['time']
-                                            try:
-                                                ts = time_str.strip()
-                                                if '-' in ts:
-                                                    fmt = '%Y-%m-%d %H:%M' if ':' in ts else '%Y-%m-%d'
-                                                elif '/' in ts:
-                                                    fmt = '%Y/%m/%d %H:%M' if ':' in ts else '%Y/%m/%d'
-                                                else:
-                                                    continue
-                                                row_date = datetime.strptime(ts, fmt)
-                                                # 只记录日期部分
-                                                collected_dates.add(row_date.date())
-                                            except ValueError:
-                                                continue
-                                        
-                                        # 每次获取新数据后，立即检查是否已经覆盖了最近3个工作日
-                                        if recent_workdays.issubset(collected_dates):
-                                            has_covered_recent_workdays = True
-                                            logger.info("✅ 已成功覆盖最近3个工作日的数据，提前结束爬取")
-                                            break
-                                            
-                                        delay = get_random_delay("success")
-                                    except Exception as e:
-                                        logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
-                                        delay = get_random_delay("failure")
-                                else:
-                                    logger.warning(f"Page {page}: No data or parsing failed")
-                                    delay = get_random_delay("failure")
+                                        ts = time_str.strip()
+                                        if '-' in ts:
+                                            fmt = '%Y-%m-%d %H:%M' if ':' in ts else '%Y-%m-%d'
+                                            row_date = datetime.strptime(ts, fmt)
+                                            # 只记录日期部分
+                                            collected_dates.add(row_date.date())
+                                        elif '/' in ts:
+                                            fmt = '%Y/%m/%d %H:%M' if ':' in ts else '%Y/%m/%d'
+                                            row_date = datetime.strptime(ts, fmt)
+                                            # 只记录日期部分
+                                            collected_dates.add(row_date.date())
+                                        else:
+                                            continue
+                                    except ValueError:
+                                        continue
+                                    
+                                    # 每次获取新数据后，立即检查是否已经覆盖了最近3个工作日
+                                    if recent_workdays.issubset(collected_dates):
+                                        has_covered_recent_workdays = True
+                                        logger.info("✅ 已成功覆盖最近3个工作日的数据，提前结束爬取")
+                                        break
+                                
+                                # 设置成功延迟
+                                delay = get_random_delay("success")
                             except Exception as e:
-                                logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
+                                logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
                                 delay = get_random_delay("failure")
-                            
-                            # Add random pause if needed
-                            if should_insert_random_pause():
-                                random_pause = get_random_pause()
-                                logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
-                                time.sleep(random_pause)
-                            
-                            # Add base delay
-                            logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
-                            time.sleep(delay)
                         else:
-                            logger.error(f"Page {page}: Failed to fetch")
+                            logger.warning(f"Page {page}: No data or parsing failed")
                             delay = get_random_delay("failure")
-                            time.sleep(delay)
-                            
+                        
+                        # Add random pause if needed
+                        if should_insert_random_pause():
+                            random_pause = get_random_pause()
+                            logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
+                            time.sleep(random_pause)
+                        
+                        # Add base delay
+                        logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
+                        time.sleep(delay)
                     except Exception as e:
-                        logger.error(f"❌ Fatal error on page {page} - {type(e).__name__}: {str(e)}")
-                        # Add longer delay on fatal errors
-                        fatal_delay = random.uniform(10, 15)
-                        logger.info(f"⚠️ Fatal error occurred, waiting {fatal_delay:.2f}s before continuing")
-                        time.sleep(fatal_delay)
-                        # Reset session to avoid persistent issues
-                        self._reset_session()
-                        continue
+                        logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
+                        delay = get_random_delay("failure")
+                        
+                        # Add random pause if needed
+                        if should_insert_random_pause():
+                            random_pause = get_random_pause()
+                            logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
+                            time.sleep(random_pause)
+                        
+                        # Add base delay
+                        logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
+                        time.sleep(delay)
+                else:
+                    logger.error(f"Page {page}: Failed to fetch")
+                    delay = get_random_delay("failure")
+                    time.sleep(delay)
+                    continue
                 
                 # 如果已经覆盖了最近3个工作日，跳出循环
                 if recent_workdays.issubset(collected_dates):
@@ -684,25 +658,7 @@ class CrawlerService:
                 
             logger.info(f"✅ Crawl completed: Saved {total_saved} new records from {total_pages_crawled} pages")
             
-            # 通过 WebSocket 发送通知给前端，让前端刷新数据
-            try:
-                # 发送爬虫完成通知
-                notification = {
-                    "id": f"crawler-{int(time.time())}",
-                    "title": "爬虫完成",
-                    "content": f"成功爬取 {total_saved} 条新数据，共爬取 {total_pages_crawled} 页",
-                    "type": "crawler",
-                    "link": "/analysis/crawler",
-                    "source": "crawler",
-                    "created_at": datetime.utcnow().isoformat(),
-                    "status": "unread"
-                }
-                
-                loop.run_until_complete(send_notification_via_websocket("admin", notification))
-                logger.info("📤 WebSocket 通知发送成功")
-            except Exception as e:
-                logger.error(f"❌ 发送 WebSocket 通知失败: {type(e).__name__}: {str(e)}")
-        finally:
-            loop.close()
-        
+            # 不使用WebSocket通知，避免事件循环冲突
+            # 直接记录日志即可
+            
         return total_saved

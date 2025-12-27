@@ -25,7 +25,7 @@
       <!-- 新增：astock子菜单 -->
       <el-menu-item index="/analysis/popularity">人气排行榜</el-menu-item>
       <el-menu-item index="/analysis/capital-flow">资金流向排行榜</el-menu-item>
-      <el-menu-item index="/analysis/cross-analysis">交叉分析</el-menu-item>
+      <el-menu-item index="/analysis/cross-analysis">达人热点</el-menu-item>
     </el-sub-menu>
 
     <el-menu-item index="/tasks">

@@ -90,6 +90,8 @@ class CrossAnalysisItem(BaseModel):
     success_count: int = Field(..., description="分析数")
     success_rate: float = Field(..., description="成功率")
     source_url: str = Field(..., description="来源URL")
+    popularity_rank: Optional[int] = Field(None, description="人气排名")
+    capital_flow_rank: Optional[int] = Field(None, description="资金流向排名")
     crawled_at: Optional[datetime] = Field(None, description="爬取时间")
     
     class Config:

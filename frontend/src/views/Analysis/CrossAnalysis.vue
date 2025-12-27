@@ -4,9 +4,9 @@
       <template #header>
         <div class="card-header">
           <div class="header-left">
-            <span class="title">交叉分析</span>
-            <el-tag type="info" class="ml-2">178448.com</el-tag>
-          </div>
+          <span class="title">达人热点</span>
+          <el-tag type="info" class="ml-2">178448.com</el-tag>
+        </div>
         </div>
       </template>
 
@@ -36,12 +36,34 @@
         </el-table-column>
         <el-table-column prop="success_count" label="分析数" width="100" sortable>
           <template #default="scope">
-            <span class="font-bold">{{ scope.row.success_count }}</span>
+            <span class="font-bold" :class="{ 'text-red-500': scope.row.success_count > 0 }">
+              {{ scope.row.success_count }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="analysis_time" label="分析时间" width="160" sortable />
         <el-table-column prop="analysis_reason" label="分析理由" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="analysis_price" label="分析价格" width="100" />
+        <el-table-column prop="analysis_price" label="分析价格" width="100">
+          <template #default="scope">
+            <span :class="{ 'text-red-500': parseFloat(scope.row.analysis_price) > 0 }">
+              {{ scope.row.analysis_price }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="popularity_rank" label="人气" width="80" align="center">
+          <template #default="scope">
+            <span :class="{ 'text-red-500': scope.row.popularity_rank > 0 }">
+              {{ scope.row.popularity_rank || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="capital_flow_rank" label="资金" width="80" align="center">
+          <template #default="scope">
+            <span :class="{ 'text-red-500': scope.row.capital_flow_rank > 0 }">
+              {{ scope.row.capital_flow_rank || '-' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="scope">
             <el-button size="small" type="primary" plain @click="analyzeStock(scope.row)">
