@@ -252,106 +252,114 @@ async def _print_config_summary(logger):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时初始化
-    setup_logging()
-    logger = logging.getLogger("app.main")
-
-    # 验证启动配置
-    try:
-        from app.core.startup_validator import validate_startup_config
-        validate_startup_config()
-    except Exception as e:
-        logger.error(f"配置验证失败: {e}")
-        raise
-
-    await init_db()
-
-    # 创建默认管理员用户
-    try:
-        from app.services.user_service import user_service
-        await user_service.create_admin_user()
-        logger.info("✅ 默认管理员用户已创建或已存在")
-    except Exception as e:
-        logger.error(f"❌ 创建管理员用户失败: {e}")
+    # 启动时初始化 - 仅保留必要的异步操作，将所有其他操作移到后台任务执行
+    import asyncio
     
-    # 初始化股票名称代码映射
-    try:
-        from app.services.stock_map_service import stock_map_service
-        # 检查当前映射数量
-        current_count = stock_map_service.get_total_count()
-        logger.info(f"📊 当前股票映射数量: {current_count} 条")
+    # 1. 首先初始化数据库连接（这是异步的，不会阻塞事件循环）
+    await init_db()
+    
+    # 2. 然后创建logger实例（这是同步的，但很快）
+    logger = logging.getLogger("app.main")
+    
+    # 3. 将所有后续操作移到一个单独的后台任务中执行，避免阻塞事件循环
+    async def background_startup_tasks():
+        """后台执行的启动任务"""
+        # 配置日志
+        setup_logging()
         
-        # 每次启动都重新加载映射，确保数据最新
-        csv_path = "docs/fjzt_a.csv"
-        from pathlib import Path
-        if Path(csv_path).exists():
-            logger.info("📝 开始重新加载股票名称代码映射")
-            # 先清空现有映射，确保数据完全一致
-            clear_result = stock_map_service.clear_mappings()
-            if clear_result:
-                logger.info("✅ 已清空现有股票映射")
-                # 从CSV文件加载最新映射
-                loaded_count = stock_map_service.load_from_csv(csv_path)
-                logger.info(f"✅ 从CSV文件加载了 {loaded_count} 条股票映射")
-            else:
-                logger.warning("⚠️  清空现有映射失败，使用增量加载")
-                loaded_count = stock_map_service.load_from_csv(csv_path)
-                logger.info(f"✅ 从CSV文件增量加载了 {loaded_count} 条股票映射")
-        else:
-            logger.warning(f"⚠️  CSV文件不存在: {csv_path}")
-            
-        # 显示最终映射数量
-        final_count = stock_map_service.get_total_count()
-        logger.info(f"✅ 股票映射初始化完成，共 {final_count} 条")
-    except Exception as e:
-        logger.error(f"❌ 初始化股票映射失败: {e}", exc_info=True)
-
-    #  配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
-    try:
-        from app.core.config_bridge import bridge_config_to_env
-        bridge_config_to_env()
-    except Exception as e:
-        logger.warning(f"⚠️  配置桥接失败: {e}")
-        logger.warning("⚠️  TradingAgents 将使用 .env 文件中的配置")
-
-    # Apply dynamic settings (log_level, enable_monitoring) from ConfigProvider
-    try:
-        from app.services.config_provider import provider as config_provider  # local import to avoid early DB init issues
-        eff = await config_provider.get_effective_system_settings()
-        desired_level = str(eff.get("log_level", "INFO")).upper()
-        setup_logging(log_level=desired_level)
-        for name in ("webapi", "worker", "uvicorn", "fastapi"):
-            logging.getLogger(name).setLevel(desired_level)
+        # 验证启动配置
         try:
-            from app.middleware.operation_log_middleware import set_operation_log_enabled
-            set_operation_log_enabled(bool(eff.get("enable_monitoring", True)))
-        except Exception:
-            pass
-    except Exception as e:
-        logging.getLogger("webapi").warning(f"Failed to apply dynamic settings: {e}")
-
-    # 显示配置摘要
-    await _print_config_summary(logger)
-
-    logger.info("TradingAgents FastAPI backend started")
-
-    # 启动期：若需要在休市时补充上一交易日收盘快照
-    if settings.QUOTES_BACKFILL_ON_STARTUP:
-        try:
-            qi = QuotesIngestionService()
-            await qi.ensure_indexes()
-            await qi.backfill_last_close_snapshot_if_needed()
+            from app.core.startup_validator import validate_startup_config
+            validate_startup_config()
         except Exception as e:
-            logger.warning(f"Startup backfill failed (ignored): {e}")
-
-    # 启动每日定时任务：可配置
-    scheduler: AsyncIOScheduler | None = None
-    try:
-        from croniter import croniter
-    except Exception:
-        croniter = None  # 可选依赖
-    try:
-        import asyncio
+            logger.error(f"配置验证失败: {e}")
+            raise
+        
+        # 创建默认管理员用户
+        try:
+            from app.services.user_service import user_service
+            await user_service.create_admin_user()
+            logger.info("✅ 默认管理员用户已创建或已存在")
+        except Exception as e:
+            logger.error(f"❌ 创建管理员用户失败: {e}")
+        
+        # 初始化股票名称代码映射
+        try:
+            from app.services.stock_map_service import stock_map_service
+            # 检查当前映射数量
+            current_count = stock_map_service.get_total_count()
+            logger.info(f"📊 当前股票映射数量: {current_count} 条")
+            
+            # 每次启动都重新加载映射，确保数据最新
+            csv_path = "docs/fjzt_a.csv"
+            from pathlib import Path
+            if Path(csv_path).exists():
+                logger.info("📝 开始重新加载股票名称代码映射")
+                # 先清空现有映射，确保数据完全一致
+                clear_result = stock_map_service.clear_mappings()
+                if clear_result:
+                    logger.info("✅ 已清空现有股票映射")
+                    # 从CSV文件加载最新映射
+                    loaded_count = stock_map_service.load_from_csv(csv_path)
+                    logger.info(f"✅ 从CSV文件加载了 {loaded_count} 条股票映射")
+                else:
+                    logger.warning("⚠️  清空现有映射失败，使用增量加载")
+                    loaded_count = stock_map_service.load_from_csv(csv_path)
+                    logger.info(f"✅ 从CSV文件增量加载了 {loaded_count} 条股票映射")
+            else:
+                logger.warning(f"⚠️  CSV文件不存在: {csv_path}")
+                
+            # 显示最终映射数量
+            final_count = stock_map_service.get_total_count()
+            logger.info(f"✅ 股票映射初始化完成，共 {final_count} 条")
+        except Exception as e:
+            logger.error(f"❌ 初始化股票映射失败: {e}", exc_info=True)
+        
+        # 配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
+        try:
+            from app.core.config_bridge import bridge_config_to_env
+            bridge_config_to_env()
+        except Exception as e:
+            logger.warning(f"⚠️  配置桥接失败: {e}")
+            logger.warning("⚠️  TradingAgents 将使用 .env 文件中的配置")
+        
+        # Apply dynamic settings (log_level, enable_monitoring) from ConfigProvider
+        try:
+            from app.services.config_provider import provider as config_provider  # local import to avoid early DB init issues
+            eff = await config_provider.get_effective_system_settings()
+            desired_level = str(eff.get("log_level", "INFO")).upper()
+            setup_logging(log_level=desired_level)
+            for name in ("webapi", "worker", "uvicorn", "fastapi"):
+                logging.getLogger(name).setLevel(desired_level)
+            try:
+                from app.middleware.operation_log_middleware import set_operation_log_enabled
+                set_operation_log_enabled(bool(eff.get("enable_monitoring", True)))
+            except Exception:
+                pass
+        except Exception as e:
+            logging.getLogger("webapi").warning(f"Failed to apply dynamic settings: {e}")
+        
+        # 显示配置摘要
+        await _print_config_summary(logger)
+        logger.info("TradingAgents FastAPI backend started")
+        
+        # 启动期：若需要在休市时补充上一交易日收盘快照
+        if settings.QUOTES_BACKFILL_ON_STARTUP:
+            try:
+                qi = QuotesIngestionService()
+                await qi.ensure_indexes()
+                await qi.backfill_last_close_snapshot_if_needed()
+            except Exception as e:
+                logger.warning(f"Startup backfill failed (ignored): {e}")
+        
+        # 启动每日定时任务：可配置
+        scheduler: AsyncIOScheduler | None = None
+        try:
+            from croniter import croniter
+        except Exception:
+            croniter = None  # 可选依赖
+        
+        # 创建调度器实例
         scheduler = AsyncIOScheduler(timezone=settings.TIMEZONE)
 
         # 使用多数据源同步服务（支持自动切换）
@@ -642,14 +650,14 @@ async def lifespan(app: FastAPI):
             try:
                 logger.info("🕷️ 开始执行所有爬虫任务...")
                 
-                # 1. 运行CrawlerService爬虫
+                # 1. 运行CrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
                 crawler_service = CrawlerService()
-                crawler_total = crawler_service.crawl_pages(1, 20)
+                crawler_total = await asyncio.to_thread(crawler_service.crawl_pages, 1, 20)
                 logger.info(f"✅ CrawlerService爬虫完成: 保存了 {crawler_total} 条新数据")
                 
-                # 2. 运行ScrapyCrawlerService爬虫
+                # 2. 运行ScrapyCrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
                 scrapy_service = ScrapyCrawlerService()
-                scrapy_total = scrapy_service.run_all_crawlers()
+                scrapy_total = await asyncio.to_thread(scrapy_service.run_all_crawlers)
                 logger.info(f"✅ ScrapyCrawlerService爬虫完成: 保存了 {scrapy_total} 条新数据")
                 
                 logger.info(f"✅ 所有爬虫任务完成: 总共保存了 {crawler_total + scrapy_total} 条新数据")
@@ -665,6 +673,9 @@ async def lifespan(app: FastAPI):
             replace_existing=True
         )
         logger.info(f"✅ 所有爬虫任务已配置: 每 {settings.CRAWLER_INTERVAL_MINUTES} 分钟执行一次")
+
+        # 立即执行一次爬虫任务 - 移到后台任务执行，避免阻塞服务器启动
+        asyncio.create_task(run_all_crawlers())
 
         # ==================== 港股/美股数据配置 ====================
         # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
@@ -683,24 +694,25 @@ async def lifespan(app: FastAPI):
         else:
             logger.info(f"📰 新闻数据同步已配置（仅自选股）: {settings.NEWS_SYNC_CRON}")
 
-        scheduler.start()
+        try:
+            scheduler.start()
 
-        # 立即执行一次所有爬虫任务，而不是等待配置的间隔时间
-        logger.info("🚀 立即执行初始爬虫任务...")
-        import asyncio
-        asyncio.create_task(run_all_crawlers())
+            # 设置调度器实例到服务中，以便API可以管理任务
+            set_scheduler_instance(scheduler)
+            logger.info("✅ 调度器服务已初始化")
+        except Exception as e:
+            logger.error(f"❌ 调度器启动失败: {e}", exc_info=True)
+            raise  # 抛出异常，阻止应用启动
 
-        # 设置调度器实例到服务中，以便API可以管理任务
-        set_scheduler_instance(scheduler)
-        logger.info("✅ 调度器服务已初始化")
-    except Exception as e:
-        logger.error(f"❌ 调度器启动失败: {e}", exc_info=True)
-        raise  # 抛出异常，阻止应用启动
+    # 启动后台任务
+    asyncio.create_task(background_startup_tasks())
 
     try:
         yield
     finally:
         # 关闭时清理
+        from app.services.scheduler_service import get_scheduler_instance
+        scheduler = get_scheduler_instance()
         if scheduler:
             try:
                 scheduler.shutdown(wait=False)

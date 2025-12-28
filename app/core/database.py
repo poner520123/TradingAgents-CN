@@ -203,8 +203,9 @@ async def init_database():
 
         logger.info("🎉 所有数据库连接初始化完成")
 
-        # 🔥 初始化数据库视图和索引
-        await init_database_views_and_indexes()
+        # 🔥 初始化数据库视图和索引 - 移到后台任务执行
+        import asyncio
+        asyncio.create_task(init_database_views_and_indexes())
 
     except Exception as e:
         logger.error(f"💥 数据库初始化失败: {e}")
