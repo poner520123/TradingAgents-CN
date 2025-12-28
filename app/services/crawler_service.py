@@ -24,6 +24,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class CrawlerService:
     """Handles fetching and parsing of stock prediction pages with session management."""
     
+    # 类变量，用于累积计数
+    total_pages_crawled = 0
+    total_saved = 0
+    
     def __init__(self):
         # Initialize sync MongoDB connection
         self.client = MongoClient(settings.MONGO_URI)
@@ -489,7 +493,6 @@ class CrawlerService:
     def crawl_pages(self, start_page, end_page, force=False):
         """Crawl pages with enhanced thread stability."""
         # Logic similar to original but with enhanced error handling and smart page adjustment
-        total_saved = 0
         from app.routers.websocket_notifications import send_notification_via_websocket
         import asyncio
         
@@ -502,7 +505,16 @@ class CrawlerService:
         has_covered_recent_workdays = False
         # 最大爬取页面数，防止无限循环
         MAX_PAGES = 200
-        total_pages_crawled = 0
+        
+        # 使用类变量累积计数，而不是局部变量
+        # 每次调用时从类变量获取当前计数，而不是重新初始化
+        if hasattr(self.__class__, 'total_pages_crawled'):
+            # 已经初始化过，继续累积
+            pass
+        else:
+            # 首次初始化
+            self.__class__.total_pages_crawled = 0
+            self.__class__.total_saved = 0
         
         # 获取最近3个工作日的日期集合
         recent_workdays = set()
@@ -532,16 +544,24 @@ class CrawlerService:
         
         # 发送开始爬取的通知
         async def send_start_notification():
-            notification = {
-                "id": f"crawler_{datetime.utcnow().timestamp()}",
-                "title": "爬虫任务开始",
-                "content": f"开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日",
-                "type": "info",
-                "source": "crawler",
-                "created_at": datetime.utcnow().isoformat(),
-                "status": "unread"
-            }
-            await send_notification_via_websocket("admin", notification)
+            # 使用通知服务保存通知到数据库
+            from app.services.notifications_service import get_notifications_service
+            from app.models.notification import NotificationCreate
+            
+            notifications_service = get_notifications_service()
+            
+            notification_create = NotificationCreate(
+                user_id="admin",
+                type="system",
+                title="爬虫任务开始",
+                content=f"开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日",
+                link="/analysis/cross-analysis",
+                source="crawler",
+                severity="info"
+            )
+            
+            # 保存到数据库并通过WebSocket发送
+            await notifications_service.create_and_publish(notification_create)
         
         # 使用单独的事件循环发送通知
         try:
@@ -551,31 +571,37 @@ class CrawlerService:
         except Exception as e:
             logger.error(f"❌ 发送爬虫开始通知失败: {e}")
         
-        while not has_covered_recent_workdays and total_pages_crawled < MAX_PAGES:
+        while not has_covered_recent_workdays and self.__class__.total_pages_crawled < MAX_PAGES:
             logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
             
             for page in range(current_start_page, current_end_page + 1):
-                if total_pages_crawled >= MAX_PAGES:
+                if self.__class__.total_pages_crawled >= MAX_PAGES:
                     logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，停止爬取")
                     break
                     
-                total_pages_crawled += 1
+                self.__class__.total_pages_crawled += 1
                 # 发送开始爬取某页的通知
                 msg = f"正在爬取第 {page} 页..."
                 logger.info(msg)
                 
-                # 发送爬取页面通知
+                # 发送爬取页面通知到数据库和WebSocket
                 async def send_page_start_notification():
-                    notification = {
-                        "id": f"crawler_{datetime.utcnow().timestamp()}",
-                        "title": "爬虫进度",
-                        "content": msg,
-                        "type": "info",
-                        "source": "crawler",
-                        "created_at": datetime.utcnow().isoformat(),
-                        "status": "unread"
-                    }
-                    await send_notification_via_websocket("admin", notification)
+                    from app.services.notifications_service import get_notifications_service
+                    from app.models.notification import NotificationCreate
+                    
+                    notifications_service = get_notifications_service()
+                    
+                    notification_create = NotificationCreate(
+                        user_id="admin",
+                        type="system",
+                        title="爬虫进度",
+                        content=msg,
+                        link="/analysis/cross-analysis",
+                        source="crawler",
+                        severity="info"
+                    )
+                    
+                    await notifications_service.create_and_publish(notification_create)
                 
                 try:
                     loop = asyncio.new_event_loop()
@@ -591,22 +617,28 @@ class CrawlerService:
                         if data:
                             try:
                                 saved = self.save_data(data)
-                                total_saved += saved
+                                self.__class__.total_saved += saved
                                 msg = f"第 {page} 页: 成功保存 {saved} 条新数据"
                                 logger.info(msg)
                                 
-                                # 发送保存数据通知
+                                # 发送保存数据通知到数据库和WebSocket
                                 async def send_save_notification():
-                                    notification = {
-                                        "id": f"crawler_{datetime.utcnow().timestamp()}",
-                                        "title": "爬虫进度",
-                                        "content": msg,
-                                        "type": "success",
-                                        "source": "crawler",
-                                        "created_at": datetime.utcnow().isoformat(),
-                                        "status": "unread"
-                                    }
-                                    await send_notification_via_websocket("admin", notification)
+                                    from app.services.notifications_service import get_notifications_service
+                                    from app.models.notification import NotificationCreate
+                                    
+                                    notifications_service = get_notifications_service()
+                                    
+                                    notification_create = NotificationCreate(
+                                        user_id="admin",
+                                        type="system",
+                                        title="爬虫进度",
+                                        content=msg,
+                                        link="/analysis/cross-analysis",
+                                        source="crawler",
+                                        severity="success"
+                                    )
+                                    
+                                    await notifications_service.create_and_publish(notification_create)
                                 
                                 try:
                                     loop = asyncio.new_event_loop()
@@ -649,16 +681,22 @@ class CrawlerService:
                                 
                                 # 发送保存失败通知
                                 async def send_save_error_notification():
-                                    notification = {
-                                        "id": f"crawler_{datetime.utcnow().timestamp()}",
-                                        "title": "爬虫错误",
-                                        "content": f"第 {page} 页: 保存数据失败 - {str(e)}",
-                                        "type": "error",
-                                        "source": "crawler",
-                                        "created_at": datetime.utcnow().isoformat(),
-                                        "status": "unread"
-                                    }
-                                    await send_notification_via_websocket("admin", notification)
+                                    from app.services.notifications_service import get_notifications_service
+                                    from app.models.notification import NotificationCreate
+                                    
+                                    notifications_service = get_notifications_service()
+                                    
+                                    notification_create = NotificationCreate(
+                                        user_id="admin",
+                                        type="system",
+                                        title="爬虫错误",
+                                        content=f"第 {page} 页: 保存数据失败 - {str(e)}",
+                                        link="/analysis/cross-analysis",
+                                        source="crawler",
+                                        severity="error"
+                                    )
+                                    
+                                    await notifications_service.create_and_publish(notification_create)
                                 
                                 try:
                                     loop = asyncio.new_event_loop()
@@ -685,16 +723,22 @@ class CrawlerService:
                         
                         # 发送解析错误通知
                         async def send_parse_error_notification():
-                            notification = {
-                                "id": f"crawler_{datetime.utcnow().timestamp()}",
-                                "title": "爬虫错误",
-                                "content": f"第 {page} 页: 解析HTML失败 - {str(e)}",
-                                "type": "error",
-                                "source": "crawler",
-                                "created_at": datetime.utcnow().isoformat(),
-                                "status": "unread"
-                            }
-                            await send_notification_via_websocket("admin", notification)
+                            from app.services.notifications_service import get_notifications_service
+                            from app.models.notification import NotificationCreate
+                            
+                            notifications_service = get_notifications_service()
+                            
+                            notification_create = NotificationCreate(
+                                user_id="admin",
+                                type="system",
+                                title="爬虫错误",
+                                content=f"第 {page} 页: 解析HTML失败 - {str(e)}",
+                                link="/analysis/cross-analysis",
+                                source="crawler",
+                                severity="error"
+                            )
+                            
+                            await notifications_service.create_and_publish(notification_create)
                         
                         try:
                             loop = asyncio.new_event_loop()
@@ -718,16 +762,22 @@ class CrawlerService:
                     
                     # 发送获取页面失败通知
                     async def send_fetch_error_notification():
-                        notification = {
-                            "id": f"crawler_{datetime.utcnow().timestamp()}",
-                            "title": "爬虫错误",
-                            "content": f"第 {page} 页: 获取页面失败",
-                            "type": "error",
-                            "source": "crawler",
-                            "created_at": datetime.utcnow().isoformat(),
-                            "status": "unread"
-                        }
-                        await send_notification_via_websocket("admin", notification)
+                        from app.services.notifications_service import get_notifications_service
+                        from app.models.notification import NotificationCreate
+                        
+                        notifications_service = get_notifications_service()
+                        
+                        notification_create = NotificationCreate(
+                            user_id="admin",
+                            type="system",
+                            title="爬虫错误",
+                            content=f"第 {page} 页: 获取页面失败",
+                            link="/analysis/cross-analysis",
+                            source="crawler",
+                            severity="error"
+                        )
+                        
+                        await notifications_service.create_and_publish(notification_create)
                     
                     try:
                         loop = asyncio.new_event_loop()
@@ -772,21 +822,27 @@ class CrawlerService:
                 missing_days = recent_workdays - collected_dates
                 logger.warning(f"⚠️ 未能覆盖所有最近3个工作日的数据，缺少: {sorted(missing_days)}")
                 
-            logger.info(f"✅ Crawl completed: Saved {total_saved} new records from {total_pages_crawled} pages")
+            logger.info(f"✅ Crawl completed: Saved {self.__class__.total_saved} new records from {self.__class__.total_pages_crawled} pages")
             
             # 发送爬取完成通知
             async def send_completion_notification():
-                status = "success" if total_saved > 0 else "warning"
-                notification = {
-                    "id": f"crawler_{datetime.utcnow().timestamp()}",
-                    "title": "爬虫任务完成",
-                    "content": f"爬虫任务完成，共爬取 {total_pages_crawled} 页，保存 {total_saved} 条新数据",
-                    "type": status,
-                    "source": "crawler",
-                    "created_at": datetime.utcnow().isoformat(),
-                    "status": "unread"
-                }
-                await send_notification_via_websocket("admin", notification)
+                from app.services.notifications_service import get_notifications_service
+                from app.models.notification import NotificationCreate
+                
+                notifications_service = get_notifications_service()
+                
+                status = "success" if self.__class__.total_saved > 0 else "warning"
+                notification_create = NotificationCreate(
+                    user_id="admin",
+                    type="system",
+                    title="爬虫任务完成",
+                    content=f"爬虫任务完成，共爬取 {self.__class__.total_pages_crawled} 页，保存 {self.__class__.total_saved} 条新数据",
+                    link="/analysis/cross-analysis",
+                    source="crawler",
+                    severity=status
+                )
+                
+                await notifications_service.create_and_publish(notification_create)
             
             try:
                 loop = asyncio.new_event_loop()
@@ -795,4 +851,4 @@ class CrawlerService:
             except Exception as e:
                 logger.error(f"❌ 发送爬虫完成通知失败: {e}")
         
-        return total_saved
+        return self.__class__.total_saved
