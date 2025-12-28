@@ -677,6 +677,36 @@ async def lifespan(app: FastAPI):
         # 立即执行一次爬虫任务 - 移到后台任务执行，避免阻塞服务器启动
         asyncio.create_task(run_all_crawlers())
 
+        # ==================== 股票筛选服务配置 ====================
+        logger.info("🔄 配置股票筛选服务定时任务...")
+
+        from app.services.stock_selector_service import stock_selector_service
+
+        async def run_stock_selector():
+            """运行股票筛选服务"""
+            try:
+                logger.info("📊 开始执行股票筛选...")
+                result = stock_selector_service.run_screening()
+                if result:
+                    logger.info("✅ 股票筛选服务执行成功")
+                else:
+                    logger.warning("⚠️ 股票筛选服务执行失败")
+            except Exception as e:
+                logger.error(f"❌ 股票筛选服务失败: {e}", exc_info=True)
+
+        # 配置股票筛选服务定时任务，每30分钟执行一次
+        scheduler.add_job(
+            run_stock_selector,
+            IntervalTrigger(minutes=30, timezone=settings.TIMEZONE),
+            id="stock_selector_task",
+            name="股票筛选服务",
+            replace_existing=True
+        )
+        logger.info("✅ 股票筛选服务已配置: 每 30 分钟执行一次")
+
+        # 立即执行一次股票筛选 - 移到后台任务执行，避免阻塞服务器启动
+        asyncio.create_task(run_stock_selector())
+
         # ==================== 港股/美股数据配置 ====================
         # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
         logger.info("🇭🇰 港股数据采用按需获取+缓存模式")
@@ -787,6 +817,20 @@ async def log_requests(request: Request, call_next):
     status_emoji = "✅" if response.status_code < 400 else "❌"
     logger.info(f"{status_emoji} {request.method} {request.url.path} - 状态: {response.status_code} - 耗时: {process_time:.3f}s")
 
+    return response
+
+
+# UTF-8编码中间件，确保所有响应都使用正确的编码
+@app.middleware("http")
+async def ensure_utf8_encoding(request: Request, call_next):
+    response = await call_next(request)
+    
+    # 确保响应头包含正确的UTF-8编码
+    if "content-type" in response.headers:
+        content_type = response.headers["content-type"]
+        if "application/json" in content_type and "charset" not in content_type:
+            response.headers["content-type"] = f"{content_type}; charset=utf-8"
+    
     return response
 
 

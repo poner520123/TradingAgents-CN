@@ -109,7 +109,7 @@ async def migrate_web_users():
                 continue
             
             # 检查用户是否已存在
-            existing_user = await user_service.get_user_by_username(username)
+            existing_user = user_service.get_user_by_username(username)
             if existing_user:
                 logger.info(f"✓ 用户 {username} 已存在，跳过")
                 continue
@@ -173,7 +173,7 @@ async def verify_migration():
     
     try:
         # 验证管理员用户
-        admin_user = await user_service.get_user_by_username("admin")
+        admin_user = user_service.get_user_by_username("admin")
         if admin_user:
             logger.info("✅ 管理员用户验证成功")
             logger.info(f"   用户名: {admin_user.username}")

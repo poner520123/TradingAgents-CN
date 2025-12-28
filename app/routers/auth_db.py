@@ -91,7 +91,7 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
         raise HTTPException(status_code=401, detail="Invalid token")
 
     # 从数据库获取用户信息
-    user = await user_service.get_user_by_username(token_data.sub)
+    user = user_service.get_user_by_username(token_data.sub)
     if not user:
         logger.warning(f"❌ 用户不存在: {token_data.sub}")
         raise HTTPException(status_code=401, detail="User not found")
@@ -236,7 +236,7 @@ async def refresh_token(payload: RefreshTokenRequest):
             raise HTTPException(status_code=401, detail="Invalid refresh token")
 
         # 验证用户是否仍然存在且激活
-        user = await user_service.get_user_by_username(token_data.sub)
+        user = user_service.get_user_by_username(token_data.sub)
         if not user or not user.is_active:
             logger.warning(f"❌ 用户不存在或已禁用: {token_data.sub}")
             raise HTTPException(status_code=401, detail="User not found or inactive")

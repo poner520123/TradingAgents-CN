@@ -182,7 +182,7 @@ class UserService:
             logger.error(f"❌ 用户认证失败: {e}")
             return None
     
-    async def get_user_by_username(self, username: str) -> Optional[User]:
+    def get_user_by_username(self, username: str) -> Optional[User]:
         """根据用户名获取用户"""
         try:
             user_doc = self.users_collection.find_one({"username": username})
