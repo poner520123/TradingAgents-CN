@@ -86,7 +86,7 @@ const routes: RouteRecordRaw[] = [
         name: 'PopularityRanking',
         component: () => import('@/views/Analysis/PopularityRanking.vue'),
         meta: {
-          title: '人气排行榜',
+          title: '人气排行',
           requiresAuth: true
         }
       },
@@ -95,7 +95,7 @@ const routes: RouteRecordRaw[] = [
         name: 'CapitalFlowRanking',
         component: () => import('@/views/Analysis/CapitalFlowRanking.vue'),
         meta: {
-          title: '资金流向排行榜',
+          title: '资金排行',
           requiresAuth: true
         }
       },

@@ -530,6 +530,27 @@ class CrawlerService:
         
         logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
         
+        # 发送开始爬取的通知
+        async def send_start_notification():
+            notification = {
+                "id": f"crawler_{datetime.utcnow().timestamp()}",
+                "title": "爬虫任务开始",
+                "content": f"开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日",
+                "type": "info",
+                "source": "crawler",
+                "created_at": datetime.utcnow().isoformat(),
+                "status": "unread"
+            }
+            await send_notification_via_websocket("admin", notification)
+        
+        # 使用单独的事件循环发送通知
+        try:
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(send_start_notification())
+            loop.close()
+        except Exception as e:
+            logger.error(f"❌ 发送爬虫开始通知失败: {e}")
+        
         while not has_covered_recent_workdays and total_pages_crawled < MAX_PAGES:
             logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
             
@@ -543,8 +564,25 @@ class CrawlerService:
                 msg = f"正在爬取第 {page} 页..."
                 logger.info(msg)
                 
-                # 不使用WebSocket通知，避免事件循环冲突
-                # 直接记录日志即可
+                # 发送爬取页面通知
+                async def send_page_start_notification():
+                    notification = {
+                        "id": f"crawler_{datetime.utcnow().timestamp()}",
+                        "title": "爬虫进度",
+                        "content": msg,
+                        "type": "info",
+                        "source": "crawler",
+                        "created_at": datetime.utcnow().isoformat(),
+                        "status": "unread"
+                    }
+                    await send_notification_via_websocket("admin", notification)
+                
+                try:
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(send_page_start_notification())
+                    loop.close()
+                except Exception as e:
+                    logger.error(f"❌ 发送爬虫进度通知失败: {e}")
                 
                 html = self.fetch_page(page)
                 if html:
@@ -557,8 +595,25 @@ class CrawlerService:
                                 msg = f"第 {page} 页: 成功保存 {saved} 条新数据"
                                 logger.info(msg)
                                 
-                                # 不使用WebSocket通知，避免事件循环冲突
-                                # 直接记录日志即可
+                                # 发送保存数据通知
+                                async def send_save_notification():
+                                    notification = {
+                                        "id": f"crawler_{datetime.utcnow().timestamp()}",
+                                        "title": "爬虫进度",
+                                        "content": msg,
+                                        "type": "success",
+                                        "source": "crawler",
+                                        "created_at": datetime.utcnow().isoformat(),
+                                        "status": "unread"
+                                    }
+                                    await send_notification_via_websocket("admin", notification)
+                                
+                                try:
+                                    loop = asyncio.new_event_loop()
+                                    loop.run_until_complete(send_save_notification())
+                                    loop.close()
+                                except Exception as e:
+                                    logger.error(f"❌ 发送爬虫保存通知失败: {e}")
                                 
                                 # 收集已获取数据的日期
                                 for item in data:
@@ -591,6 +646,26 @@ class CrawlerService:
                             except Exception as e:
                                 logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
                                 delay = get_random_delay("failure")
+                                
+                                # 发送保存失败通知
+                                async def send_save_error_notification():
+                                    notification = {
+                                        "id": f"crawler_{datetime.utcnow().timestamp()}",
+                                        "title": "爬虫错误",
+                                        "content": f"第 {page} 页: 保存数据失败 - {str(e)}",
+                                        "type": "error",
+                                        "source": "crawler",
+                                        "created_at": datetime.utcnow().isoformat(),
+                                        "status": "unread"
+                                    }
+                                    await send_notification_via_websocket("admin", notification)
+                                
+                                try:
+                                    loop = asyncio.new_event_loop()
+                                    loop.run_until_complete(send_save_error_notification())
+                                    loop.close()
+                                except Exception as e:
+                                    logger.error(f"❌ 发送爬虫错误通知失败: {e}")
                         else:
                             logger.warning(f"Page {page}: No data or parsing failed")
                             delay = get_random_delay("failure")
@@ -608,6 +683,26 @@ class CrawlerService:
                         logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
                         delay = get_random_delay("failure")
                         
+                        # 发送解析错误通知
+                        async def send_parse_error_notification():
+                            notification = {
+                                "id": f"crawler_{datetime.utcnow().timestamp()}",
+                                "title": "爬虫错误",
+                                "content": f"第 {page} 页: 解析HTML失败 - {str(e)}",
+                                "type": "error",
+                                "source": "crawler",
+                                "created_at": datetime.utcnow().isoformat(),
+                                "status": "unread"
+                            }
+                            await send_notification_via_websocket("admin", notification)
+                        
+                        try:
+                            loop = asyncio.new_event_loop()
+                            loop.run_until_complete(send_parse_error_notification())
+                            loop.close()
+                        except Exception as e:
+                            logger.error(f"❌ 发送爬虫错误通知失败: {e}")
+                        
                         # Add random pause if needed
                         if should_insert_random_pause():
                             random_pause = get_random_pause()
@@ -620,6 +715,27 @@ class CrawlerService:
                 else:
                     logger.error(f"Page {page}: Failed to fetch")
                     delay = get_random_delay("failure")
+                    
+                    # 发送获取页面失败通知
+                    async def send_fetch_error_notification():
+                        notification = {
+                            "id": f"crawler_{datetime.utcnow().timestamp()}",
+                            "title": "爬虫错误",
+                            "content": f"第 {page} 页: 获取页面失败",
+                            "type": "error",
+                            "source": "crawler",
+                            "created_at": datetime.utcnow().isoformat(),
+                            "status": "unread"
+                        }
+                        await send_notification_via_websocket("admin", notification)
+                    
+                    try:
+                        loop = asyncio.new_event_loop()
+                        loop.run_until_complete(send_fetch_error_notification())
+                        loop.close()
+                    except Exception as e:
+                        logger.error(f"❌ 发送爬虫错误通知失败: {e}")
+                    
                     time.sleep(delay)
                     continue
                 
@@ -658,7 +774,25 @@ class CrawlerService:
                 
             logger.info(f"✅ Crawl completed: Saved {total_saved} new records from {total_pages_crawled} pages")
             
-            # 不使用WebSocket通知，避免事件循环冲突
-            # 直接记录日志即可
+            # 发送爬取完成通知
+            async def send_completion_notification():
+                status = "success" if total_saved > 0 else "warning"
+                notification = {
+                    "id": f"crawler_{datetime.utcnow().timestamp()}",
+                    "title": "爬虫任务完成",
+                    "content": f"爬虫任务完成，共爬取 {total_pages_crawled} 页，保存 {total_saved} 条新数据",
+                    "type": status,
+                    "source": "crawler",
+                    "created_at": datetime.utcnow().isoformat(),
+                    "status": "unread"
+                }
+                await send_notification_via_websocket("admin", notification)
             
+            try:
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(send_completion_notification())
+                loop.close()
+            except Exception as e:
+                logger.error(f"❌ 发送爬虫完成通知失败: {e}")
+        
         return total_saved

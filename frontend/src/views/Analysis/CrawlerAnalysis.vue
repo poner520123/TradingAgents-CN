@@ -8,30 +8,16 @@
             <el-tag type="info" class="ml-2">178448.com</el-tag>
           </div>
           <div class="header-right" style="display: flex; align-items: center; gap: 10px;">
-            <el-input-number v-model="crawlPages" :min="1" :max="20" size="default" style="width: 120px;" />
-            <div class="crawl-controls" style="display: flex; align-items: center; gap: 10px;">
-              <el-switch 
-                v-model="autoCrawlEnabled" 
-                @change="handleAutoCrawlToggle" 
-              />
-              <span>定时爬取</span>
-              <el-select v-model="autoCrawlInterval" placeholder="选择间隔" size="small" @change="handleIntervalChange" style="width: 120px;">
-                <el-option label="3分钟" :value="3" />
-                <el-option label="5分钟" :value="5" />
-                <el-option label="10分钟" :value="10" />
-                <el-option label="30分钟" :value="30" />
-                <el-option label="1小时" :value="60" />
-              </el-select>
-              <el-button 
-                type="danger" 
-                size="small" 
-                @click="handleStopCrawl" 
-                :disabled="!crawling && !autoCrawlEnabled"
-              >
-                关闭爬虫
-              </el-button>
-            </div>
-          </div>
+          <el-input-number v-model="crawlPages" :min="1" :max="20" size="default" style="width: 120px;" />
+          <el-button 
+            type="primary" 
+            size="default" 
+            @click="handleStartCrawl" 
+            :disabled="crawling"
+          >
+            手动爬取
+          </el-button>
+        </div>
         </div>
       </template>
 
@@ -177,67 +163,10 @@ interface LogItem {
 const crawlerLogs = ref<LogItem[]>([])
 const logContainer = ref<HTMLElement | null>(null)
 
-// WebSocket连接引用
-let ws: WebSocket | null = null
-
-// 自动爬取相关
-const autoCrawlEnabled = ref(false)
-const autoCrawlInterval = ref(5) // 分钟
-let crawlTimer: number | null = null
-
 // 页面加载时初始化股票名称到代码的映射
 onMounted(async () => {
   await loadStockNameCodeMap()
   await fetchData()
-  
-  // 从localStorage读取自动爬取状态
-  const savedAutoCrawlEnabled = localStorage.getItem('autoCrawlEnabled')
-  const savedAutoCrawlInterval = localStorage.getItem('autoCrawlInterval')
-  
-  if (savedAutoCrawlEnabled) {
-    autoCrawlEnabled.value = savedAutoCrawlEnabled === 'true'
-  }
-  
-  if (savedAutoCrawlInterval) {
-    autoCrawlInterval.value = parseInt(savedAutoCrawlInterval)
-  }
-  
-  // 如果之前开启了自动爬取，恢复自动爬取
-  if (autoCrawlEnabled.value) {
-    startAutoCrawl()
-  }
-  
-  // 添加WebSocket消息监听
-  const token = localStorage.getItem('auth-token') || ''
-  if (token) {
-    ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/ws/notifications?token=${token}`)
-    
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data)
-        
-        // 处理爬虫进度通知
-        if (message.type === 'notification' && message.data?.type === 'progress' && message.data?.source === 'crawler') {
-          handleProgressUpdate(message.data)
-        }
-        // 处理爬虫完成通知
-        else if (message.type === 'notification' && message.data?.type === 'crawler') {
-          console.log('[CrawlerAnalysis] 收到爬虫完成通知，自动刷新数据')
-          handleCrawlerCompleted(message.data)
-        }
-      } catch (error) {
-        console.error('[CrawlerAnalysis] 解析WebSocket消息失败:', error)
-      }
-    }
-    
-    ws.onerror = (error) => {
-      console.error('[CrawlerAnalysis] WebSocket连接错误:', error)
-    }
-    
-    ws.onclose = () => {
-      console.log('[CrawlerAnalysis] WebSocket连接关闭')
-    }
-  }
 })
 
 const fetchData = async () => {
@@ -320,65 +249,6 @@ const handleStartCrawl = async () => {
     ElMessage.error('启动爬取失败')
     crawling.value = false
   }
-}
-
-// 自动爬取开关切换
-const handleAutoCrawlToggle = () => {
-  // 保存状态到localStorage
-  localStorage.setItem('autoCrawlEnabled', autoCrawlEnabled.value.toString())
-  
-  if (autoCrawlEnabled.value) {
-    startAutoCrawl()
-    ElMessage.success(`已开启自动爬取，每 ${autoCrawlInterval.value} 分钟执行一次`)
-  } else {
-    stopAutoCrawl()
-    ElMessage.info('已关闭自动爬取')
-  }
-}
-
-// 自动爬取间隔改变
-const handleIntervalChange = () => {
-  // 保存间隔到localStorage
-  localStorage.setItem('autoCrawlInterval', autoCrawlInterval.value.toString())
-  
-  if (autoCrawlEnabled.value) {
-    stopAutoCrawl()
-    startAutoCrawl()
-    ElMessage.success(`自动爬取间隔已更新为 ${autoCrawlInterval.value} 分钟`)
-  }
-}
-
-// 启动自动爬取
-const startAutoCrawl = () => {
-  stopAutoCrawl() // 先停止已有的定时器
-  const intervalMs = autoCrawlInterval.value * 60 * 1000
-  crawlTimer = window.setInterval(() => {
-    handleStartCrawl()
-  }, intervalMs)
-}
-
-// 停止自动爬取
-const stopAutoCrawl = () => {
-  if (crawlTimer) {
-    clearInterval(crawlTimer)
-    crawlTimer = null
-  }
-}
-
-// 关闭爬虫
-const handleStopCrawl = () => {
-  // 停止当前爬取状态
-  crawling.value = false
-  
-  // 停止自动爬取
-  if (autoCrawlEnabled.value) {
-    autoCrawlEnabled.value = false
-    stopAutoCrawl()
-    // 保存关闭状态到localStorage
-    localStorage.setItem('autoCrawlEnabled', 'false')
-  }
-  
-  ElMessage.success('爬虫已关闭')
 }
 
 const analyzeStock = (row: CrawlerData) => {
@@ -496,22 +366,7 @@ const closeCrawlerStatus = () => {
 
 // 组件卸载时清理资源
 onUnmounted(() => {
-  // 清理定时器
-  if (crawlTimer) {
-    clearInterval(crawlTimer)
-    crawlTimer = null
-  }
-  
-  // 关闭WebSocket连接
-  if (ws) {
-    try {
-      ws.close()
-      console.log('[CrawlerAnalysis] WebSocket连接已关闭')
-    } catch (error) {
-      console.error('[CrawlerAnalysis] 关闭WebSocket连接失败:', error)
-    }
-    ws = null
-  }
+  // 无资源需要清理
 })
 </script>
 

@@ -23,8 +23,8 @@
       <!-- 新增：将分析报告作为股票分析的子菜单 -->
       <el-menu-item index="/reports">分析报告</el-menu-item>
       <!-- 新增：astock子菜单 -->
-      <el-menu-item index="/analysis/popularity">人气排行榜</el-menu-item>
-      <el-menu-item index="/analysis/capital-flow">资金流向排行榜</el-menu-item>
+      <el-menu-item index="/analysis/popularity">人气排行</el-menu-item>
+      <el-menu-item index="/analysis/capital-flow">资金排行</el-menu-item>
       <el-menu-item index="/analysis/cross-analysis">达人热点</el-menu-item>
     </el-sub-menu>
 

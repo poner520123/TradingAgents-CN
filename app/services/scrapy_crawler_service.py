@@ -115,10 +115,13 @@ class ScrapyCrawlerService:
         # Import here to avoid circular import
         from app.services.stock_map_service import stock_map_service
         
+        # Get current timestamp for all items
+        current_time = datetime.utcnow()
+        
         for item in data:
             try:
                 # Add crawled_at timestamp
-                item['crawled_at'] = datetime.utcnow()
+                item['crawled_at'] = current_time
                 
                 # Process rank_change field: convert '-' to None
                 if 'rank_change' in item and item['rank_change'] == '-':
@@ -135,15 +138,11 @@ class ScrapyCrawlerService:
                     if stock_name:
                         item['name'] = stock_name
                 
-                # Upsert based on code
-                result = self.popularity_collection.update_one(
-                    {"code": item["code"]}, 
-                    {"$set": item}, 
-                    upsert=True
-                )
-                
-                if result.upserted_id:
-                    count += 1
+                # Upsert based on code, but always update with latest data
+                # We want to keep all data with different crawled_at timestamps
+                # to allow historical analysis
+                self.popularity_collection.insert_one(item)
+                count += 1
             except Exception as e:
                 logger.error(f"❌ Error saving popularity data: {e}")
         
@@ -159,10 +158,13 @@ class ScrapyCrawlerService:
         # Import here to avoid circular import
         from app.services.stock_map_service import stock_map_service
         
+        # Get current timestamp for all items
+        current_time = datetime.utcnow()
+        
         for item in data:
             try:
                 # Add crawled_at timestamp
-                item['crawled_at'] = datetime.utcnow()
+                item['crawled_at'] = current_time
                 
                 # Get correct stock name from stock_map_service
                 if 'code' in item:
@@ -170,15 +172,10 @@ class ScrapyCrawlerService:
                     if stock_name:
                         item['name'] = stock_name
                 
-                # Upsert based on code
-                result = self.capital_flow_collection.update_one(
-                    {"code": item["code"]}, 
-                    {"$set": item}, 
-                    upsert=True
-                )
-                
-                if result.upserted_id:
-                    count += 1
+                # Insert new record instead of upserting
+                # to keep all historical data
+                self.capital_flow_collection.insert_one(item)
+                count += 1
             except Exception as e:
                 logger.error(f"❌ Error saving capital flow data: {e}")
         
@@ -194,10 +191,13 @@ class ScrapyCrawlerService:
         # Import here to avoid circular import
         from app.services.stock_map_service import stock_map_service
         
+        # Get current timestamp for all items
+        current_time = datetime.utcnow()
+        
         for item in data:
             try:
                 # Add crawled_at timestamp
-                item['crawled_at'] = datetime.utcnow()
+                item['crawled_at'] = current_time
                 
                 # Get correct stock code and name from stock_map_service
                 if 'name' in item:
@@ -212,6 +212,7 @@ class ScrapyCrawlerService:
                             item['name'] = stock_name
                 
                 # Upsert based on expert_name, code, and analysis_time
+                # This ensures we don't duplicate the same analysis
                 result = self.expert_ranking_collection.update_one(
                     {
                         "expert_name": item["expert_name"],
@@ -222,12 +223,12 @@ class ScrapyCrawlerService:
                     upsert=True
                 )
                 
-                if result.upserted_id:
+                if result.upserted_id or result.modified_count > 0:
                     count += 1
             except Exception as e:
                 logger.error(f"❌ Error saving expert ranking data: {e}")
         
-        logger.info(f"✅ Saved {count} new expert ranking records")
+        logger.info(f"✅ Saved {count} expert ranking records (new: {count})")
         return count
     
     def crawl_popularity(self):
@@ -304,12 +305,13 @@ class ScrapyCrawlerService:
     
     def get_cross_analysis_data(self, page=1, page_size=20):
         """Get cross analysis data with popularity and capital flow ranks."""
-        # Get all expert ranking data first for de-duplication
-        cursor = self.expert_ranking_collection.find()
-        cursor = cursor.sort([
-            ("success_rate", DESCENDING),
-            ("success_count", DESCENDING)
-        ])
+        from datetime import datetime, timedelta
+        
+        # Get all expert ranking data first for de-duplication, filter by recent 7 days
+        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        cursor = self.expert_ranking_collection.find({
+            "crawled_at": {"$gte": one_week_ago}
+        })
         
         all_data = list(cursor)
         # Convert ObjectId to string
@@ -335,37 +337,52 @@ class ScrapyCrawlerService:
                 # If the existing record doesn't have code but current one does, replace it
                 if not existing_has_code and current_has_code:
                     unique_items[unique_key] = item
-                # If both have code, keep the newer one
+                # If both have code, keep the newer one based on crawled_at
                 elif existing_has_code and current_has_code:
-                    existing_time = existing_item.get('analysis_time', '')
-                    current_time = item.get('analysis_time', '')
-                    if current_time > existing_time:
+                    # Try to compare crawled_at first (more reliable than analysis_time)
+                    existing_crawled = existing_item.get('crawled_at', datetime.min)
+                    current_crawled = item.get('crawled_at', datetime.min)
+                    
+                    if current_crawled > existing_crawled:
                         unique_items[unique_key] = item
+                    # Fall back to analysis_time if crawled_at is not available
+                    elif existing_crawled == current_crawled:
+                        existing_time = existing_item.get('analysis_time', '')
+                        current_time = item.get('analysis_time', '')
+                        if current_time > existing_time:
+                            unique_items[unique_key] = item
                 # If existing has code but current doesn't, keep existing
             else:
                 # Add new item if key doesn't exist
                 unique_items[unique_key] = item
         
-        # Convert back to list
+        # Convert back to list and sort by crawled_at first, then analysis_time in descending order
         unique_data = list(unique_items.values())
+        unique_data.sort(key=lambda x: (x.get('crawled_at', datetime.min), x.get('analysis_time', '')), reverse=True)
         total = len(unique_data)
         
         # Apply pagination
         skip = (page - 1) * page_size
         paginated_data = unique_data[skip:skip + page_size]
         
-        # Get all popularity data with ranks
-        popularity_data = list(self.popularity_collection.find().sort([("rank", ASCENDING)]).limit(100))
+        # Get all popularity data with ranks, use latest data (sort by crawled_at)
+        popularity_data = list(self.popularity_collection.find().sort([
+            ("crawled_at", DESCENDING),
+            ("rank", ASCENDING)
+        ]).limit(200))
         popularity_rank_map = {item['code']: item['rank'] for item in popularity_data}
         
-        # Get all capital flow data with ranks
-        capital_flow_data = list(self.capital_flow_collection.find().sort([("main_flow", DESCENDING)]).limit(100))
+        # Get all capital flow data with ranks, use latest data (sort by crawled_at)
+        capital_flow_data = list(self.capital_flow_collection.find().sort([
+            ("crawled_at", DESCENDING),
+            ("main_flow", DESCENDING)
+        ]).limit(200))
         capital_flow_rank_map = {item['code']: i+1 for i, item in enumerate(capital_flow_data)}
         
         # Add popularity and capital flow ranks to cross analysis data
         for item in paginated_data:
             code = item.get('code')
-            # Only add rank if it's in top 100, otherwise leave it as None (will show '-')
+            # Add rank regardless of top 100 limit, will show actual rank or None if not found
             item['popularity_rank'] = popularity_rank_map.get(code)
             item['capital_flow_rank'] = capital_flow_rank_map.get(code)
         

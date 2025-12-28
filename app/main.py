@@ -634,53 +634,37 @@ async def lifespan(app: FastAPI):
         logger.info("🔄 配置爬虫定时任务...")
 
         from app.services.crawler_service import CrawlerService
-
-        async def run_crawler_task():
-            """运行爬虫任务 - 每5分钟自动执行"""
-            try:
-                logger.info("🕷️ 开始自动爬虫任务...")
-                crawler_service = CrawlerService()
-                # 爬取1-20页数据
-                total_saved = crawler_service.crawl_pages(1, 20)
-                logger.info(f"✅ 自动爬虫任务完成: 保存了 {total_saved} 条新数据")
-            except Exception as e:
-                logger.error(f"❌ 自动爬虫任务失败: {e}", exc_info=True)
-
-        # 配置爬虫定时任务，每5分钟执行一次
-        scheduler.add_job(
-            run_crawler_task,
-            IntervalTrigger(minutes=5, timezone=settings.TIMEZONE),
-            id="crawler_task",
-            name="自动爬虫任务",
-            replace_existing=True
-        )
-        logger.info("✅ 自动爬虫任务已配置: 每5分钟执行一次")
-
-        # ==================== Scrapy爬虫任务配置 ====================
-        logger.info("🔄 配置Scrapy爬虫定时任务...")
-
         from app.services.scrapy_crawler_service import ScrapyCrawlerService
 
-        async def run_scrapy_crawlers():
-            """运行Scrapy爬虫任务 - 每10分钟自动执行"""
+        # 定义所有爬虫任务
+        async def run_all_crawlers():
+            """运行所有爬虫任务 - 包括CrawlerService和ScrapyCrawlerService"""
             try:
-                logger.info("🕷️ 开始自动Scrapy爬虫任务...")
+                logger.info("🕷️ 开始执行所有爬虫任务...")
+                
+                # 1. 运行CrawlerService爬虫
+                crawler_service = CrawlerService()
+                crawler_total = crawler_service.crawl_pages(1, 20)
+                logger.info(f"✅ CrawlerService爬虫完成: 保存了 {crawler_total} 条新数据")
+                
+                # 2. 运行ScrapyCrawlerService爬虫
                 scrapy_service = ScrapyCrawlerService()
-                # 运行所有Scrapy爬虫
-                total_saved = scrapy_service.run_all_crawlers()
-                logger.info(f"✅ 自动Scrapy爬虫任务完成: 保存了 {total_saved} 条新数据")
+                scrapy_total = scrapy_service.run_all_crawlers()
+                logger.info(f"✅ ScrapyCrawlerService爬虫完成: 保存了 {scrapy_total} 条新数据")
+                
+                logger.info(f"✅ 所有爬虫任务完成: 总共保存了 {crawler_total + scrapy_total} 条新数据")
             except Exception as e:
-                logger.error(f"❌ 自动Scrapy爬虫任务失败: {e}", exc_info=True)
+                logger.error(f"❌ 爬虫任务失败: {e}", exc_info=True)
 
-        # 配置Scrapy爬虫定时任务，每10分钟执行一次
+        # 配置爬虫定时任务，按照配置的间隔执行
         scheduler.add_job(
-            run_scrapy_crawlers,
-            IntervalTrigger(minutes=10, timezone=settings.TIMEZONE),
-            id="scrapy_crawler_task",
-            name="自动Scrapy爬虫任务",
+            run_all_crawlers,
+            IntervalTrigger(minutes=settings.CRAWLER_INTERVAL_MINUTES, timezone=settings.TIMEZONE),
+            id="all_crawlers_task",
+            name="所有爬虫任务",
             replace_existing=True
         )
-        logger.info("✅ 自动Scrapy爬虫任务已配置: 每10分钟执行一次")
+        logger.info(f"✅ 所有爬虫任务已配置: 每 {settings.CRAWLER_INTERVAL_MINUTES} 分钟执行一次")
 
         # ==================== 港股/美股数据配置 ====================
         # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
@@ -701,10 +685,10 @@ async def lifespan(app: FastAPI):
 
         scheduler.start()
 
-        # 立即执行一次Scrapy爬虫任务，而不是等待10分钟
-        logger.info("🚀 立即执行初始Scrapy爬虫任务...")
+        # 立即执行一次所有爬虫任务，而不是等待配置的间隔时间
+        logger.info("🚀 立即执行初始爬虫任务...")
         import asyncio
-        asyncio.create_task(run_scrapy_crawlers())
+        asyncio.create_task(run_all_crawlers())
 
         # 设置调度器实例到服务中，以便API可以管理任务
         set_scheduler_instance(scheduler)

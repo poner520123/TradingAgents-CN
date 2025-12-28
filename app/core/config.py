@@ -280,6 +280,9 @@ class Settings(BaseSettings):
     NEWS_SYNC_CRON: str = Field(default="0 */2 * * *")  # 每2小时
     NEWS_SYNC_HOURS_BACK: int = Field(default=24)
     NEWS_SYNC_MAX_PER_SOURCE: int = Field(default=50)
+    
+    # ===== 爬虫配置 =====
+    CRAWLER_INTERVAL_MINUTES: int = Field(default=10, description="爬虫自动执行间隔（分钟）")
 
     @property
     def is_production(self) -> bool:

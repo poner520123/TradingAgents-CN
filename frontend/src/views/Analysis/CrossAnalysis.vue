@@ -17,24 +17,24 @@
             <span class="font-bold">{{ scope.row.expert_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="code" label="股票代码" width="120" fixed>
+        <el-table-column prop="code" label="股票代码" width="90" fixed>
           <template #default="scope">
             <span class="font-bold">{{ scope.row.code }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="股票名称" width="120" fixed>
+        <el-table-column prop="name" label="股票名称" width="90" fixed>
           <template #default="scope">
             <span class="font-bold">{{ scope.row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="success_rate" label="成功率" width="100" sortable>
+        <el-table-column prop="success_rate" label="成功率" width="90" sortable>
           <template #default="scope">
             <el-tag :type="getSuccessRateType(scope.row.success_rate)">
               {{ scope.row.success_rate }}%
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="success_count" label="分析数" width="100" sortable>
+        <el-table-column prop="success_count" label="分析数" width="80" sortable>
           <template #default="scope">
             <span class="font-bold" :class="{ 'text-red-500': scope.row.success_count > 0 }">
               {{ scope.row.success_count }}

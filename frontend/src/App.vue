@@ -21,6 +21,9 @@
       v-model="showConfigWizard"
       @complete="handleWizardComplete"
     />
+    
+    <!-- 全局通知组件 -->
+    <GlobalNotification />
   </div>
 </template>
 
@@ -28,6 +31,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import NetworkStatus from '@/components/NetworkStatus.vue'
+import GlobalNotification from '@/components/Global/GlobalNotification.vue'
 import axios from 'axios'
 import { configApi } from '@/api/config'
 
