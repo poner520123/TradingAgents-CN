@@ -21,14 +21,14 @@ class StockSelectorService:
         self.screening_results_collection = self.db.screening_results
         self._init_db()
         
-        # 通知配置
+        # 通知配置 - 使用用户提供的Webhook
         self.dingtalk_config = {
-            "webhook": settings.DINGTALK_WEBHOOK if hasattr(settings, "DINGTALK_WEBHOOK") else "",
-            "secret": settings.DINGTALK_SECRET if hasattr(settings, "DINGTALK_SECRET") else ""
+            "webhook": "https://oapi.dingtalk.com/robot/send?access_token=3445c95927eecb7e1902c05a572d6406929f3d782eb2d6c3b6c5acd16a0485a9",
+            "secret": ""
         }
         self.feishu_config = {
-            "webhook": settings.FEISHU_WEBHOOK if hasattr(settings, "FEISHU_WEBHOOK") else "",
-            "secret": settings.FEISHU_SECRET if hasattr(settings, "FEISHU_SECRET") else ""
+            "webhook": "https://open.feishu.cn/open-apis/bot/v2/hook/d6dbf25a-85dd-4541-843c-669ee096686e",
+            "secret": ""
         }
     
     def _init_db(self):
@@ -188,18 +188,32 @@ class StockSelectorService:
             defense_low = round(current_price * 0.95, 2)
             defense_high = round(current_price * 1.02, 2)
             
-            # 生成报告
+            # 生成报告 - 包含STOCK关键字以满足机器人要求，使用美化格式
             report = f"""
-案例名称: [{stock_name}]({stock_code})
-AI研究团队
-时间: 【{datetime.now().strftime('%Y年%m月%d日 %H:%M')}】
-关注区间: {attention_low}-{attention_high}
-目标区间: {target_low}-{target_high}
-防守区间: {defense_low}-{defense_high}
-仓位配置: 5%
-技术面: 股价近期突破压力位，当前涨幅{increase}%，量能放大，短期趋势向好。
-基本面: 所属概念板块{concepts}，符合当前市场热点，具备较强的上涨逻辑。
-以上内容仅供参考，不构成投资建议,
+# STOCK - 🌟 股票筛选结果
+
+## 📊 核心信息
+- **案例名称**: [{stock_name}]({stock_code})
+- **研究团队**: AI研究团队
+- **发布时间**: 【{datetime.now().strftime('%Y年%m月%d日 %H:%M')}】
+
+## 🎯 交易建议
+- **关注区间**: 📈 {attention_low}-{attention_high}
+- **目标区间**: 🎯 {target_low}-{target_high}
+- **防守区间**: 🛡️ {defense_low}-{defense_high}
+- **仓位配置**: 💼 5%
+
+## 📚 分析详情
+### 📉 技术面
+股价近期突破压力位，当前涨幅{increase}%，量能放大，短期趋势向好。
+
+### 📋 基本面
+所属概念板块{concepts}，符合当前市场热点，具备较强的上涨逻辑。
+
+---
+
+⚠️ **风险提示**
+以上内容仅供参考，不构成投资建议。
 股市有风险，入市需谨慎。历史战绩不代表对未来收益的承诺。
             """
             
