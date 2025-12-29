@@ -142,6 +142,38 @@ async def get_cross_analysis_data(
             page_size=page_size
         )
 
+@router.get("/hot-experts", response_model=CrossAnalysisListResponse, tags=["astock"])
+async def get_hot_experts_data(
+    limit: int = 15,
+    service: ScrapyCrawlerService = Depends(get_scrapy_crawler_service)
+):
+    """
+    获取仪表板达人热点数据
+    
+    提取交叉分析列表中，人气和资金两列都有数值（不能为空，必须大于0），
+    并且按照分析时间最新的数值之和从小到大排列，提取指定数量的记录。
+    
+    - **limit**: 返回数据条数，默认为15
+    """
+    try:
+        data = service.get_hot_experts_data(limit)
+        return CrossAnalysisListResponse(
+            success=True,
+            data=data,
+            total=len(data),
+            page=1,
+            page_size=limit
+        )
+    except Exception as e:
+        return CrossAnalysisListResponse(
+            success=False,
+            message=f"获取达人热点数据失败: {str(e)}",
+            data=[],
+            total=0,
+            page=1,
+            page_size=limit
+        )
+
 @router.post("/run-crawlers", tags=["astock"])
 async def run_all_crawlers(
     service: ScrapyCrawlerService = Depends(get_scrapy_crawler_service)

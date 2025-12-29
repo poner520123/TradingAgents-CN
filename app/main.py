@@ -613,14 +613,14 @@ async def lifespan(app: FastAPI):
             logger.info(f"🔍 BaoStock状态检查已配置: {settings.BAOSTOCK_STATUS_CHECK_CRON}")
 
         # 新闻数据同步任务配置（使用AKShare同步所有股票新闻）
-        logger.info("🔄 配置新闻数据同步任务...")
+        logger.info("配置新闻数据同步任务...")
 
         from app.worker.akshare_sync_service import get_akshare_sync_service
 
         async def run_news_sync():
             """运行新闻同步任务 - 使用AKShare同步自选股新闻"""
             try:
-                logger.info("📰 开始新闻数据同步（AKShare - 仅自选股）...")
+                logger.info("开始新闻数据同步（AKShare - 仅自选股）...")
                 service = await get_akshare_sync_service()
                 result = await service.sync_news_data(
                     symbols=None,  # None + favorites_only=True 表示只同步自选股
@@ -628,7 +628,7 @@ async def lifespan(app: FastAPI):
                     favorites_only=True  # 只同步自选股
                 )
                 logger.info(
-                    f"✅ 新闻同步完成: "
+                    f"新闻同步完成: "
                     f"处理{result['total_processed']}只自选股, "
                     f"成功{result['success_count']}只, "
                     f"失败{result['error_count']}只, "
@@ -636,10 +636,10 @@ async def lifespan(app: FastAPI):
                     f"耗时{(datetime.utcnow() - result['start_time']).total_seconds():.2f}秒"
                 )
             except Exception as e:
-                logger.error(f"❌ 新闻同步失败: {e}", exc_info=True)
+                logger.error(f"新闻同步失败: {e}", exc_info=True)
 
         # ==================== 爬虫任务配置 ====================
-        logger.info("🔄 配置爬虫定时任务...")
+        logger.info("配置爬虫定时任务...")
 
         from app.services.crawler_service import CrawlerService
         from app.services.scrapy_crawler_service import ScrapyCrawlerService
@@ -648,21 +648,21 @@ async def lifespan(app: FastAPI):
         async def run_all_crawlers():
             """运行所有爬虫任务 - 包括CrawlerService和ScrapyCrawlerService"""
             try:
-                logger.info("🕷️ 开始执行所有爬虫任务...")
+                logger.info("开始执行所有爬虫任务...")
                 
                 # 1. 运行CrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
                 crawler_service = CrawlerService()
                 crawler_total = await asyncio.to_thread(crawler_service.crawl_pages, 1, 20)
-                logger.info(f"✅ CrawlerService爬虫完成: 保存了 {crawler_total} 条新数据")
+                logger.info(f"CrawlerService爬虫完成: 保存了 {crawler_total} 条新数据")
                 
                 # 2. 运行ScrapyCrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
                 scrapy_service = ScrapyCrawlerService()
                 scrapy_total = await asyncio.to_thread(scrapy_service.run_all_crawlers)
-                logger.info(f"✅ ScrapyCrawlerService爬虫完成: 保存了 {scrapy_total} 条新数据")
+                logger.info(f"ScrapyCrawlerService爬虫完成: 保存了 {scrapy_total} 条新数据")
                 
-                logger.info(f"✅ 所有爬虫任务完成: 总共保存了 {crawler_total + scrapy_total} 条新数据")
+                logger.info(f"所有爬虫任务完成: 总共保存了 {crawler_total + scrapy_total} 条新数据")
             except Exception as e:
-                logger.error(f"❌ 爬虫任务失败: {e}", exc_info=True)
+                logger.error(f"爬虫任务失败: {e}", exc_info=True)
 
         # 配置爬虫定时任务，按照配置的间隔执行
         scheduler.add_job(
@@ -672,37 +672,37 @@ async def lifespan(app: FastAPI):
             name="所有爬虫任务",
             replace_existing=True
         )
-        logger.info(f"✅ 所有爬虫任务已配置: 每 {settings.CRAWLER_INTERVAL_MINUTES} 分钟执行一次")
+        logger.info(f"所有爬虫任务已配置: 每 {settings.CRAWLER_INTERVAL_MINUTES} 分钟执行一次")
 
         # 立即执行一次爬虫任务 - 移到后台任务执行，避免阻塞服务器启动
         asyncio.create_task(run_all_crawlers())
 
         # ==================== 股票筛选服务配置 ====================
-        logger.info("🔄 配置股票筛选服务定时任务...")
+        logger.info("配置股票筛选服务定时任务...")
 
         from app.services.stock_selector_service import stock_selector_service
 
         async def run_stock_selector():
             """运行股票筛选服务"""
             try:
-                logger.info("📊 开始执行股票筛选...")
+                logger.info("开始执行股票筛选...")
                 result = stock_selector_service.run_screening()
                 if result:
-                    logger.info("✅ 股票筛选服务执行成功")
+                    logger.info("股票筛选服务执行成功")
                 else:
-                    logger.warning("⚠️ 股票筛选服务执行失败")
+                    logger.warning("股票筛选服务执行失败")
             except Exception as e:
-                logger.error(f"❌ 股票筛选服务失败: {e}", exc_info=True)
+                logger.error(f"股票筛选服务失败: {e}", exc_info=True)
 
-        # 配置股票筛选服务定时任务，每30分钟执行一次
+        # 配置股票筛选服务定时任务，每10分钟执行一次
         scheduler.add_job(
             run_stock_selector,
-            IntervalTrigger(minutes=30, timezone=settings.TIMEZONE),
+            IntervalTrigger(minutes=10, timezone=settings.TIMEZONE),
             id="stock_selector_task",
             name="股票筛选服务",
             replace_existing=True
         )
-        logger.info("✅ 股票筛选服务已配置: 每 30 分钟执行一次")
+        logger.info("✅ 股票筛选服务已配置: 每 10 分钟执行一次")
 
         # 立即执行一次股票筛选 - 移到后台任务执行，避免阻塞服务器启动
         asyncio.create_task(run_stock_selector())
@@ -729,9 +729,9 @@ async def lifespan(app: FastAPI):
 
             # 设置调度器实例到服务中，以便API可以管理任务
             set_scheduler_instance(scheduler)
-            logger.info("✅ 调度器服务已初始化")
+            logger.info("调度器服务已初始化")
         except Exception as e:
-            logger.error(f"❌ 调度器启动失败: {e}", exc_info=True)
+            logger.error(f"调度器启动失败: {e}", exc_info=True)
             raise  # 抛出异常，阻止应用启动
 
     # 启动后台任务
@@ -808,14 +808,14 @@ async def log_requests(request: Request, call_next):
 
     # 使用webapi logger记录请求
     logger = logging.getLogger("webapi")
-    logger.info(f"🔄 {request.method} {request.url.path} - 开始处理")
+    logger.info(f"{request.method} {request.url.path} - 开始处理")
 
     response = await call_next(request)
     process_time = time.time() - start_time
 
     # 记录请求完成
-    status_emoji = "✅" if response.status_code < 400 else "❌"
-    logger.info(f"{status_emoji} {request.method} {request.url.path} - 状态: {response.status_code} - 耗时: {process_time:.3f}s")
+    status = "成功" if response.status_code < 400 else "失败"
+    logger.info(f"{request.method} {request.url.path} - {status} - 状态: {response.status_code} - 耗时: {process_time:.3f}s")
 
     return response
 

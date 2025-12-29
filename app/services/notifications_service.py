@@ -22,6 +22,8 @@ class NotificationsService:
         self.channel_prefix = "notifications:"
         self.retain_days = 90
         self.max_per_user = 1000
+        # 标记是否已执行过初始化清除
+        self._initial_data_cleared = False
 
     async def _ensure_indexes(self):
         try:
@@ -32,6 +34,17 @@ class NotificationsService:
             logger.warning(f"创建索引失败(忽略): {e}")
 
     async def create_and_publish(self, payload: NotificationCreate) -> str:
+        # 首次使用时清除所有历史通知数据
+        if not self._initial_data_cleared:
+            try:
+                db = get_mongo_db()
+                # 清除所有历史通知
+                result = await db[self.collection].delete_many({})
+                logger.info(f"✅ 初始化清除历史通知数据，共删除 {result.deleted_count} 条记录")
+                self._initial_data_cleared = True
+            except Exception as e:
+                logger.warning(f"⚠️ 初始化清除历史通知数据失败: {e}")
+        
         await self._ensure_indexes()
         db = get_mongo_db()
         doc = {
@@ -93,6 +106,17 @@ class NotificationsService:
         return await db[self.collection].count_documents({"user_id": user_id, "status": "unread"})
 
     async def list(self, user_id: str, *, status: Optional[str] = None, ntype: Optional[str] = None, page: int = 1, page_size: int = 20) -> NotificationList:
+        # 首次使用时清除所有历史通知数据
+        if not self._initial_data_cleared:
+            try:
+                db = get_mongo_db()
+                # 清除所有历史通知
+                result = await db[self.collection].delete_many({})
+                logger.info(f"✅ 初始化清除历史通知数据，共删除 {result.deleted_count} 条记录")
+                self._initial_data_cleared = True
+            except Exception as e:
+                logger.warning(f"⚠️ 初始化清除历史通知数据失败: {e}")
+        
         db = get_mongo_db()
         q: Dict[str, Any] = {"user_id": user_id}
         if status in ("read", "unread"):

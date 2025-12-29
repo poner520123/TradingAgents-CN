@@ -131,14 +131,14 @@ async def migrate_web_users():
             else:
                 logger.warning(f"⚠️ 用户 {username} 迁移失败")
         
-        logger.info("✅ Web 用户配置迁移完成")
+        logger.info("Web 用户配置迁移完成")
         
     except Exception as e:
-        logger.error(f"❌ Web 用户配置迁移失败: {e}")
+        logger.error(f"Web 用户配置迁移失败: {e}")
 
 async def backup_config_files():
     """备份原配置文件"""
-    logger.info("💾 备份原配置文件...")
+    logger.info("备份原配置文件...")
     
     try:
         backup_dir = project_root / "config" / "backup"

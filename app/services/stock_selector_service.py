@@ -9,6 +9,7 @@ from pymongo import MongoClient, DESCENDING
 from app.core.config import settings
 from app.core.database import get_mongo_db_sync
 from app.services.stock_map_service import stock_map_service
+from app.services.scrapy_crawler_service import ScrapyCrawlerService
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,8 @@ class StockSelectorService:
             "webhook": "https://open.feishu.cn/open-apis/bot/v2/hook/d6dbf25a-85dd-4541-843c-669ee096686e",
             "secret": ""
         }
+        # 通知开关，默认关闭
+        self.notification_enabled = False
     
     def _init_db(self):
         """初始化数据库索引"""
@@ -333,50 +336,105 @@ class StockSelectorService:
             logger.error(f"筛选结果保存失败: {e}")
             return False
     
+    def get_hot_experts(self, limit: int = 1) -> List[Dict]:
+        """获取仪表板达人热点数据"""
+        try:
+            # 创建ScrapyCrawlerService实例
+            crawler_service = ScrapyCrawlerService()
+            # 获取达人热点数据
+            hot_experts = crawler_service.get_hot_experts_data(limit)
+            logger.info(f"获取到 {len(hot_experts)} 条达人热点数据")
+            return hot_experts
+        except Exception as e:
+            logger.error(f"获取达人热点数据失败: {e}")
+            return []
+    
+    def generate_hot_expert_report(self, hot_expert: Dict) -> str:
+        """生成达人热点报告"""
+        try:
+            stock_name = hot_expert.get('name', '未知')
+            stock_code = hot_expert.get('code', '未知')
+            popularity_rank = hot_expert.get('popularity_rank', 0)
+            capital_flow_rank = hot_expert.get('capital_flow_rank', 0)
+            combined_rank = hot_expert.get('combined_rank', 0)
+            expert_name = hot_expert.get('expert_name', '未知')
+            analysis_reason = hot_expert.get('analysis_reason', '暂无分析理由')
+            
+            # 生成报告 - 简化格式，保持整洁
+            report = f"""
+# STOCK - 达人热点推荐
+
+## 核心信息
+- 股票名称: {stock_name}
+- 股票代码: {stock_code}
+- 推荐专家: {expert_name}
+- 分析理由: {analysis_reason}
+
+## 排名信息
+- 人气排名: {popularity_rank}
+- 资金流向排名: {capital_flow_rank}
+- 综合排名: {combined_rank}
+
+## 发布时间
+{datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+---
+
+风险提示：以上内容仅供参考，不构成投资建议。
+股市有风险，入市需谨慎。
+            """
+            
+            return report.strip()
+        except Exception as e:
+            logger.error(f"生成达人热点报告失败: {e}")
+            return ""
+    
+    def send_douyin_notification(self, report: str, retry: int = 3) -> bool:
+        """发送抖音通知"""
+        # 抖音机器人通知功能暂未实现，需要用户提供具体的API文档
+        logger.warning("抖音通知功能暂未实现，跳过发送")
+        return False
+    
     def run_screening(self) -> bool:
         """执行一次股票筛选流程"""
         logger.info("开始执行股票筛选流程")
         
-        # 1. 获取最新爬虫数据
-        crawler_data = self.get_latest_crawler_data()
-        logger.info(f"获取到 {len(crawler_data)} 条爬虫数据")
+        # 1. 获取仪表板达人热点数据，只获取第一个
+        hot_experts = self.get_hot_experts(limit=1)
         
-        if not crawler_data:
-            logger.warning("未获取到爬虫数据，跳过筛选")
-            return False
-        
-        # 2. 筛选股票
-        filtered_stocks = self.filter_stocks(crawler_data)
-        logger.info(f"筛选出 {len(filtered_stocks)} 只满足条件的股票")
-        
-        if not filtered_stocks:
-            logger.info("没有满足条件的股票，跳过通知")
+        if not hot_experts:
+            logger.warning("未获取到达人热点数据，跳过通知")
             return True
         
-        # 3. 生成报告并发送通知
-        success_count = 0
-        for stock_data in filtered_stocks:
-            try:
-                # 生成报告
-                report = self.generate_report(stock_data)
-                if not report:
-                    continue
-                
-                # 保存筛选结果
-                self.save_screening_result(stock_data, report)
-                
-                # 发送通知
+        # 2. 生成报告并发送通知
+        hot_expert = hot_experts[0]
+        try:
+            # 生成报告
+            report = self.generate_hot_expert_report(hot_expert)
+            if not report:
+                return False
+            
+            # 保存筛选结果
+            self.save_screening_result(hot_expert, report)
+            
+            # 检查通知开关，只有开启时才发送通知
+            if self.notification_enabled:
                 dingtalk_success = self.send_dingtalk_notification(report)
                 feishu_success = self.send_feishu_notification(report)
+                douyin_success = self.send_douyin_notification(report)
                 
-                if dingtalk_success or feishu_success:
-                    success_count += 1
-                    logger.info(f"股票 {stock_data['stock_code']} 通知发送成功")
-            except Exception as e:
-                logger.error(f"处理股票 {stock_data.get('stock_code', '未知')} 失败: {e}")
-        
-        logger.info(f"股票筛选流程完成，成功处理 {success_count}/{len(filtered_stocks)} 只股票")
-        return True
+                if dingtalk_success or feishu_success or douyin_success:
+                    logger.info(f"达人热点 {hot_expert.get('code')} 通知发送成功")
+                    return True
+                else:
+                    logger.warning("达人热点通知发送失败")
+                    return False
+            else:
+                logger.info(f"达人热点 {hot_expert.get('code')} 筛选完成，通知开关关闭，未发送通知")
+                return True
+        except Exception as e:
+            logger.error(f"处理达人热点 {hot_expert.get('code', '未知')} 失败: {e}")
+            return False
 
 
 # 单例实例

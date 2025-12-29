@@ -30,13 +30,13 @@ class ScrapyCrawlerService:
     def _init_indexes(self):
         """Initialize database indexes."""
         try:
-            # Popularity collection indexes
-            self.popularity_collection.create_index([("code", ASCENDING)], unique=True)
+            # Popularity collection indexes - allow multiple records for same code but different crawled_at
+            self.popularity_collection.create_index([("code", ASCENDING), ("crawled_at", DESCENDING)])
             self.popularity_collection.create_index([("rank", ASCENDING)])
             self.popularity_collection.create_index([("crawled_at", DESCENDING)])
             
-            # Capital flow collection indexes
-            self.capital_flow_collection.create_index([("code", ASCENDING)], unique=True)
+            # Capital flow collection indexes - allow multiple records for same code but different crawled_at
+            self.capital_flow_collection.create_index([("code", ASCENDING), ("crawled_at", DESCENDING)])
             self.capital_flow_collection.create_index([("main_flow", DESCENDING)])
             self.capital_flow_collection.create_index([("crawled_at", DESCENDING)])
             
@@ -387,6 +387,52 @@ class ScrapyCrawlerService:
             item['capital_flow_rank'] = capital_flow_rank_map.get(code)
         
         return paginated_data, total
+    
+    def get_hot_experts_data(self, limit=15):
+        """Get hot experts data for dashboard.
+        
+        Extract cross analysis data where both popularity_rank and capital_flow_rank have values (>0),
+        sort by the sum of the latest values in ascending order, and extract the top N unique records.
+        
+        Args:
+            limit: Number of records to return
+        
+        Returns:
+            List of hot experts data
+        """
+        from datetime import datetime, timedelta
+        
+        # Get cross analysis data with popularity and capital flow ranks
+        cross_data, _ = self.get_cross_analysis_data(page=1, page_size=1000)  # Get all data first
+        
+        # Filter data where both popularity_rank and capital_flow_rank are not None and > 0
+        filtered_data = []
+        for item in cross_data:
+            popularity_rank = item.get('popularity_rank')
+            capital_flow_rank = item.get('capital_flow_rank')
+            
+            if (popularity_rank is not None and popularity_rank > 0 and
+                capital_flow_rank is not None and capital_flow_rank > 0):
+                # Calculate combined rank (sum of popularity and capital flow ranks)
+                item['combined_rank'] = popularity_rank + capital_flow_rank
+                filtered_data.append(item)
+        
+        # Sort by combined_rank in ascending order (smaller sum means better rank)
+        filtered_data.sort(key=lambda x: x['combined_rank'])
+        
+        # Deduplicate by stock code, keep the record with the lowest combined_rank for each stock
+        unique_stocks = {}
+        for item in filtered_data:
+            stock_code = item.get('code')
+            if stock_code not in unique_stocks:
+                unique_stocks[stock_code] = item
+        
+        # Convert back to list and sort again
+        unique_data = list(unique_stocks.values())
+        unique_data.sort(key=lambda x: x['combined_rank'])
+        
+        # Return top N records
+        return unique_data[:limit]
     
     def run_all_crawlers(self):
         """Run all crawlers sequentially."""

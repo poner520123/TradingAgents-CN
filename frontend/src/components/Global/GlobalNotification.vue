@@ -35,7 +35,20 @@ const MAX_NOTIFICATIONS = 5
 
 // 可见通知列表
 const visibleNotifications = computed(() => {
-  return notificationStore.items.slice(0, MAX_NOTIFICATIONS)
+  // 当用户打开消息中心抽屉时，不显示浮动弹窗
+  if (notificationStore.drawerVisible) {
+    return []
+  }
+  // 只显示包含股票名称和代码的通知
+  return notificationStore.items
+    .filter(item => {
+      // 检查通知内容是否包含股票代码格式 (如: 000001, 600000, 300000)
+      const hasStockCode = /\d{6}/.test(item.content || '')
+      // 检查通知是否与股票相关
+      const isStockRelated = item.title.includes('股票') || item.content?.includes('股票')
+      return hasStockCode || isStockRelated
+    })
+    .slice(0, MAX_NOTIFICATIONS)
 })
 
 // 定时器映射

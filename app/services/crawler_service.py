@@ -542,38 +542,6 @@ class CrawlerService:
         
         logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
         
-        # 发送开始爬取的通知
-        async def send_start_notification():
-            # 使用通知服务保存通知到数据库
-            from app.services.notifications_service import get_notifications_service
-            from app.models.notification import NotificationCreate
-            from app.services.user_service import user_service
-            
-            notifications_service = get_notifications_service()
-            
-            # 获取管理员用户的实际ID
-            admin_user = user_service.get_user_by_username("admin")
-            admin_user_id = str(admin_user.id) if admin_user else "admin"
-            
-            notification_create = NotificationCreate(
-                user_id=admin_user_id,
-                type="system",
-                title="爬虫任务开始",
-                content=f"开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日",
-                link="/analysis/cross-analysis",
-                source="crawler",
-                severity="info"
-            )
-            
-            # 保存到数据库并通过WebSocket发送
-            await notifications_service.create_and_publish(notification_create)
-        
-        # 使用asyncio.run发送通知，这是从同步代码运行异步函数的推荐方式
-        try:
-            asyncio.run(send_start_notification())
-        except Exception as e:
-            logger.error(f"❌ 发送爬虫开始通知失败: {e}")
-        
         while not has_covered_recent_workdays and self.__class__.total_pages_crawled < MAX_PAGES:
             logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
             
@@ -583,38 +551,7 @@ class CrawlerService:
                     break
                     
                 self.__class__.total_pages_crawled += 1
-                # 发送开始爬取某页的通知
-                msg = f"正在爬取第 {page} 页..."
-                logger.info(msg)
-                
-                # 发送爬取页面通知到数据库和WebSocket
-                async def send_page_start_notification():
-                    from app.services.notifications_service import get_notifications_service
-                    from app.models.notification import NotificationCreate
-                    from app.services.user_service import user_service
-                    
-                    notifications_service = get_notifications_service()
-                    
-                    # 获取管理员用户的实际ID
-                    admin_user = user_service.get_user_by_username("admin")
-                    admin_user_id = str(admin_user.id) if admin_user else "admin"
-                    
-                    notification_create = NotificationCreate(
-                        user_id=admin_user_id,
-                        type="system",
-                        title="爬虫进度",
-                        content=msg,
-                        link="/analysis/cross-analysis",
-                        source="crawler",
-                        severity="info"
-                    )
-                    
-                    await notifications_service.create_and_publish(notification_create)
-                
-                try:
-                    asyncio.run(send_page_start_notification())
-                except Exception as e:
-                    logger.error(f"❌ 发送爬虫进度通知失败: {e}")
+                logger.debug(f"正在爬取第 {page} 页...")
                 
                 html = self.fetch_page(page)
                 if html:
@@ -626,57 +563,23 @@ class CrawlerService:
                                 saved = self.save_data(data)
                                 self.__class__.total_saved += saved
                                 
-                                # 发送包含股票名称和代码的通知
-                                async def send_save_notification():
-                                    from app.services.notifications_service import get_notifications_service
-                                    from app.models.notification import NotificationCreate
-                                    from app.services.stock_map_service import stock_map_service
-                                    from app.services.user_service import user_service
-                                    
-                                    notifications_service = get_notifications_service()
-                                    
-                                    # 获取管理员用户的实际ID
-                                    admin_user = user_service.get_user_by_username("admin")
-                                    admin_user_id = str(admin_user.id) if admin_user else "admin"
-                                    
-                                    # 处理最新的20条数据
-                                    recent_stocks = data[:20]  # 只处理前20条
-                                    
-                                    for item in recent_stocks:
+                                # 记录保存数据进度，不再使用异步通知
+                                from app.services.stock_map_service import stock_map_service
+                                
+                                # 处理最新的20条数据
+                                recent_stocks = data[:20]  # 只处理前20条
+                                
+                                # 仅在调试模式下记录详细的股票信息
+                                logger.debug(f"第 {page} 页: 成功保存 {saved} 条新数据")
+                                
+                                # 仅在调试模式下记录前5条股票信息，避免日志过多
+                                if logger.isEnabledFor(logging.DEBUG):
+                                    for item in recent_stocks[:5]:  # 只记录前5条
                                         stock_name = item['stock_name']
                                         stock_code = stock_map_service.get_code_by_name(stock_name)
-                                        
-                                        # 创建包含股票名称和代码的通知
-                                        notification_create = NotificationCreate(
-                                            user_id=admin_user_id,
-                                            type="system",
-                                            title="新股票数据爬取",
-                                            content=f"已爬取: {stock_name} ({stock_code}) - {item['reason']}",
-                                            link="/analysis/cross-analysis",
-                                            source="crawler",
-                                            severity="success"
-                                        )
-                                        
-                                        await notifications_service.create_and_publish(notification_create)
-                                    
-                                    # 发送总进度通知
-                                    total_msg = f"第 {page} 页: 成功保存 {saved} 条新数据"
-                                    total_notification = NotificationCreate(
-                                        user_id=admin_user_id,
-                                        type="system",
-                                        title="爬虫进度",
-                                        content=total_msg,
-                                        link="/analysis/cross-analysis",
-                                        source="crawler",
-                                        severity="info"
-                                    )
-                                    
-                                    await notifications_service.create_and_publish(total_notification)
-                                
-                                try:
-                                    asyncio.run(send_save_notification())
-                                except Exception as e:
-                                    logger.error(f"❌ 发送爬虫保存通知失败: {e}")
+                                        logger.debug(f"已爬取: {stock_name} ({stock_code}) - {item['reason']}")
+                                    if len(recent_stocks) > 5:
+                                        logger.debug(f"... 等共 {len(recent_stocks)} 条数据")
                                 
                                 # 收集已获取数据的日期
                                 for item in data:
@@ -711,33 +614,7 @@ class CrawlerService:
                                 delay = get_random_delay("failure")
                                 
                                 # 发送保存失败通知
-                                async def send_save_error_notification():
-                                    from app.services.notifications_service import get_notifications_service
-                                    from app.models.notification import NotificationCreate
-                                    from app.services.user_service import user_service
-                                    
-                                    notifications_service = get_notifications_service()
-                                    
-                                    # 获取管理员用户的实际ID
-                                    admin_user = user_service.get_user_by_username("admin")
-                                    admin_user_id = str(admin_user.id) if admin_user else "admin"
-                                    
-                                    notification_create = NotificationCreate(
-                                        user_id=admin_user_id,
-                                        type="system",
-                                        title="爬虫错误",
-                                        content=f"第 {page} 页: 保存数据失败 - {str(e)}",
-                                        link="/analysis/cross-analysis",
-                                        source="crawler",
-                                        severity="error"
-                                    )
-                                    
-                                    await notifications_service.create_and_publish(notification_create)
-                                
-                                try:
-                                    asyncio.run(send_save_error_notification())
-                                except Exception as e:
-                                    logger.error(f"❌ 发送爬虫错误通知失败: {e}")
+                                # 保存失败已通过日志记录，无需额外通知
                         else:
                             logger.warning(f"Page {page}: No data or parsing failed")
                             delay = get_random_delay("failure")
@@ -745,86 +622,34 @@ class CrawlerService:
                         # Add random pause if needed
                         if should_insert_random_pause():
                             random_pause = get_random_pause()
-                            logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
+                            logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
                             time.sleep(random_pause)
                         
                         # Add base delay
-                        logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
+                        logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
                         time.sleep(delay)
                     except Exception as e:
                         logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
                         delay = get_random_delay("failure")
                         
                         # 发送解析错误通知
-                        async def send_parse_error_notification():
-                            from app.services.notifications_service import get_notifications_service
-                            from app.models.notification import NotificationCreate
-                            from app.services.user_service import user_service
-                            
-                            notifications_service = get_notifications_service()
-                            
-                            # 获取管理员用户的实际ID
-                            admin_user = user_service.get_user_by_username("admin")
-                            admin_user_id = str(admin_user.id) if admin_user else "admin"
-                            
-                            notification_create = NotificationCreate(
-                                user_id=admin_user_id,
-                                type="system",
-                                title="爬虫错误",
-                                content=f"第 {page} 页: 解析HTML失败 - {str(e)}",
-                                link="/analysis/cross-analysis",
-                                source="crawler",
-                                severity="error"
-                            )
-                            
-                            await notifications_service.create_and_publish(notification_create)
-                        
-                        try:
-                            asyncio.run(send_parse_error_notification())
-                        except Exception as e:
-                            logger.error(f"❌ 发送爬虫错误通知失败: {e}")
+                        # 解析错误已通过日志记录，无需额外通知
                         
                         # Add random pause if needed
                         if should_insert_random_pause():
                             random_pause = get_random_pause()
-                            logger.info(f"🔄 Inserting random pause: {random_pause:.2f}s")
+                            logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
                             time.sleep(random_pause)
                         
                         # Add base delay
-                        logger.info(f"⏱️ Waiting {delay:.2f}s before next request")
+                        logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
                         time.sleep(delay)
                 else:
                     logger.error(f"Page {page}: Failed to fetch")
                     delay = get_random_delay("failure")
                     
                     # 发送获取页面失败通知
-                    async def send_fetch_error_notification():
-                        from app.services.notifications_service import get_notifications_service
-                        from app.models.notification import NotificationCreate
-                        from app.services.user_service import user_service
-                        
-                        notifications_service = get_notifications_service()
-                        
-                        # 获取管理员用户的实际ID
-                        admin_user = user_service.get_user_by_username("admin")
-                        admin_user_id = str(admin_user.id) if admin_user else "admin"
-                        
-                        notification_create = NotificationCreate(
-                            user_id=admin_user_id,
-                            type="system",
-                            title="爬虫错误",
-                            content=f"第 {page} 页: 获取页面失败",
-                            link="/analysis/cross-analysis",
-                            source="crawler",
-                            severity="error"
-                        )
-                        
-                        await notifications_service.create_and_publish(notification_create)
-                    
-                    try:
-                        asyncio.run(send_fetch_error_notification())
-                    except Exception as e:
-                        logger.error(f"❌ 发送爬虫错误通知失败: {e}")
+                    # 获取页面失败已通过日志记录，无需额外通知
                     
                     time.sleep(delay)
                     continue
@@ -836,7 +661,7 @@ class CrawlerService:
                     break
                 
                 # 检查是否已经爬取了足够多的页面但仍未覆盖所有最近3个工作日
-                if total_pages_crawled >= MAX_PAGES:
+                if self.__class__.total_pages_crawled >= MAX_PAGES:
                     logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，但仍未覆盖所有最近3个工作日")
                     break
                     
@@ -854,7 +679,7 @@ class CrawlerService:
                     current_end_page = current_start_page + pages_in_current_round
                     logger.info(f"⚠️ 已获取到部分数据，适当增加爬取页面数。新的爬取范围: {current_start_page}-{current_end_page}")
             
-            logger.info(f"📅 最终收集的日期: {sorted(collected_dates)}")
+            logger.debug(f"📅 最终收集的日期: {sorted(collected_dates)}")
             
             if recent_workdays.issubset(collected_dates):
                 logger.info("✅ 成功覆盖所有最近3个工作日的数据")
@@ -865,33 +690,6 @@ class CrawlerService:
             logger.info(f"✅ Crawl completed: Saved {self.__class__.total_saved} new records from {self.__class__.total_pages_crawled} pages")
             
             # 发送爬取完成通知
-            async def send_completion_notification():
-                from app.services.notifications_service import get_notifications_service
-                from app.models.notification import NotificationCreate
-                from app.services.user_service import user_service
-                
-                notifications_service = get_notifications_service()
-                
-                # 获取管理员用户的实际ID
-                admin_user = user_service.get_user_by_username("admin")
-                admin_user_id = str(admin_user.id) if admin_user else "admin"
-                
-                status = "success" if self.__class__.total_saved > 0 else "warning"
-                notification_create = NotificationCreate(
-                    user_id=admin_user_id,
-                    type="system",
-                    title="爬虫任务完成",
-                    content=f"爬虫任务完成，共爬取 {self.__class__.total_pages_crawled} 页，保存 {self.__class__.total_saved} 条新数据",
-                    link="/analysis/cross-analysis",
-                    source="crawler",
-                    severity=status
-                )
-                
-                await notifications_service.create_and_publish(notification_create)
-            
-            try:
-                asyncio.run(send_completion_notification())
-            except Exception as e:
-                logger.error(f"❌ 发送爬虫完成通知失败: {e}")
+            # 爬取完成已通过日志记录，无需额外通知
         
         return self.__class__.total_saved
