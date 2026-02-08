@@ -17,17 +17,9 @@ else:
 
 from app.core.logging_context import LoggingContextFilter, trace_id_var
 
-# 🔥 在 Windows 上使用 concurrent-log-handler 避免文件占用问题
-_IS_WINDOWS = platform.system() == "Windows"
-if _IS_WINDOWS:
-    try:
-        from concurrent_log_handler import ConcurrentRotatingFileHandler
-        _USE_CONCURRENT_HANDLER = True
-    except ImportError:
-        _USE_CONCURRENT_HANDLER = False
-        logging.warning("concurrent-log-handler 未安装，在 Windows 上可能遇到日志轮转问题")
-else:
-    _USE_CONCURRENT_HANDLER = False
+# 在 Ubuntu 上使用标准的 RotatingFileHandler
+# 移除 Windows 特定的 concurrent-log-handler 配置
+_USE_CONCURRENT_HANDLER = False
 
 try:
     import tomllib as toml_loader  # Python 3.11+

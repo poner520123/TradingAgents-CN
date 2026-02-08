@@ -1,7 +1,7 @@
 #!/bin/bash
-# TA 智能Docker启动脚本 (Linux/Mac Bash版本)
+# TA 智能Docker启动脚本 (Ubuntu/Linux版本)
 # 功能：自动判断是否需要重新构建Docker镜像
-# 使用：chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
+# 使用：bash scripts/smart_start.sh
 # 
 # 判断逻辑：
 # 1. 检查是否存在tradingagents-cn镜像
@@ -10,14 +10,18 @@
 # 4. 如果镜像存在且代码无变化 -> 快速启动
 
 echo "=== TA Docker 智能启动脚本 ==="
-echo "适用环境: Linux/Mac Bash"
+echo "适用环境: Ubuntu/Linux"
+echo ""
 
 # 检查是否有镜像
-if docker images | grep -q "tradingagents-cn"; then
+imageExists=$(docker images | grep "tradingagents-cn")
+
+if [ -n "$imageExists" ]; then
     echo "✅ 发现现有镜像"
     
-    # 检查代码是否有变化
-    if git diff --quiet HEAD~1 HEAD -- . ':!*.md' ':!docs/' ':!scripts/'; then
+    # 检查代码是否有变化（简化版本）
+    gitStatus=$(git status --porcelain)
+    if [ -z "$gitStatus" ]; then
         echo "📦 代码无变化，使用快速启动"
         docker-compose up -d
     else
@@ -29,6 +33,8 @@ else
     docker-compose up -d --build
 fi
 
+echo ""
 echo "🚀 启动完成！"
 echo "Web界面: http://localhost:8501"
 echo "Redis管理: http://localhost:8081"
+echo "MongoDB管理: http://localhost:8082"

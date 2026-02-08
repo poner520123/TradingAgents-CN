@@ -1,21 +1,21 @@
 #!/bin/bash
-# TA 简化启动脚本 (Linux/Mac)
+# TA 简化启动脚本 (Ubuntu/Linux)
 # 用于日常快速启动应用
 
 echo ""
-echo "========================================"
-echo "  TA 快速启动"
-echo "========================================"
+echo "================================"
+echo "   TA 快速启动"
+echo "================================"
 echo ""
 
 # 检查虚拟环境
-if [ ! -f ".venv/bin/activate" ]; then
+if [ ! -d ".venv/bin" ]; then
     echo "[错误] 虚拟环境不存在"
     echo ""
     echo "请先运行安装脚本:"
-    echo "  chmod +x scripts/easy_install.sh"
-    echo "  ./scripts/easy_install.sh"
+    echo "   python3 scripts/easy_install.py"
     echo ""
+    read -p "按回车键退出..."
     exit 1
 fi
 
@@ -29,22 +29,23 @@ if [ ! -f ".env" ]; then
     echo ""
     echo "请先运行安装脚本或手动创建 .env 文件"
     echo ""
+    read -p "按回车键退出..."
     exit 1
 fi
 
 # 启动应用
 echo "[2/3] 启动Web应用..."
 echo ""
-echo "========================================"
-echo "  应用正在启动..."
-echo "  浏览器将自动打开 http://localhost:8501"
-echo "========================================"
+echo "================================"
+echo "   应用正在启动..."
+echo "   浏览器将自动打开 http://localhost:8501"
+echo "================================"
 echo ""
 echo "按 Ctrl+C 停止应用"
 echo ""
 
-python start_web.py
+python3 start_web.py
 
 echo ""
 echo "[3/3] 应用已停止"
-
+read -p "按回车键退出..."
