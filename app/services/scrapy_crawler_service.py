@@ -259,13 +259,39 @@ class ScrapyCrawlerService:
         return 0
     
     def get_popularity_data(self, page=1, page_size=20):
-        """Get paginated popularity data."""
-        skip = (page - 1) * page_size
-        total = self.popularity_collection.count_documents({})
-        cursor = self.popularity_collection.find()
-        cursor = cursor.sort("rank", ASCENDING).skip(skip).limit(page_size)
+        """Get paginated popularity data with deduplication."""
+        from pymongo import DESCENDING
         
-        data = list(cursor)
+        # Get the most recent record for each stock code
+        pipeline = [
+            {
+                "$sort": {"code": 1, "crawled_at": DESCENDING}
+            },
+            {
+                "$group": {
+                    "_id": "$code",
+                    "doc": {"$first": "$$ROOT"}
+                }
+            },
+            {
+                "$replaceRoot": {"newRoot": "$doc"}
+            },
+            {
+                "$sort": {"rank": ASCENDING}
+            },
+            {
+                "$skip": (page - 1) * page_size
+            },
+            {
+                "$limit": page_size
+            }
+        ]
+        
+        data = list(self.popularity_collection.aggregate(pipeline))
+        
+        # Get total count of unique stocks
+        total = self.popularity_collection.distinct("code").__len__()
+        
         # Convert ObjectId to string
         for d in data:
             if '_id' in d:
@@ -274,13 +300,39 @@ class ScrapyCrawlerService:
         return data, total
     
     def get_capital_flow_data(self, page=1, page_size=20):
-        """Get paginated capital flow data."""
-        skip = (page - 1) * page_size
-        total = self.capital_flow_collection.count_documents({})
-        cursor = self.capital_flow_collection.find()
-        cursor = cursor.sort("main_flow", DESCENDING).skip(skip).limit(page_size)
+        """Get paginated capital flow data with deduplication."""
+        from pymongo import DESCENDING
         
-        data = list(cursor)
+        # Get the most recent record for each stock code
+        pipeline = [
+            {
+                "$sort": {"code": 1, "crawled_at": DESCENDING}
+            },
+            {
+                "$group": {
+                    "_id": "$code",
+                    "doc": {"$first": "$$ROOT"}
+                }
+            },
+            {
+                "$replaceRoot": {"newRoot": "$doc"}
+            },
+            {
+                "$sort": {"main_flow": DESCENDING}
+            },
+            {
+                "$skip": (page - 1) * page_size
+            },
+            {
+                "$limit": page_size
+            }
+        ]
+        
+        data = list(self.capital_flow_collection.aggregate(pipeline))
+        
+        # Get total count of unique stocks
+        total = self.capital_flow_collection.distinct("code").__len__()
+        
         # Convert ObjectId to string
         for d in data:
             if '_id' in d:
