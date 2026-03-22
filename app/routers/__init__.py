@@ -10,7 +10,7 @@ from app.routers import (
     news_data, social_media, internal_messages, usage_statistics, 
     model_capabilities, cache, logs, crawler, sync, multi_source_sync,
     stocks, stock_data, stock_sync, multi_market_stocks, notifications,
-    websocket_notifications, scheduler, system_config
+    websocket_notifications, scheduler, system_config, ranking
 )
 
 # Alias for backward compatibility

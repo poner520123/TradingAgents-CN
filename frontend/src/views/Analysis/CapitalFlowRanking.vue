@@ -24,7 +24,7 @@
         </el-table-column>
         <el-table-column prop="price" label="价格" width="100" sortable>
           <template #default="scope">
-            <span :class="scope.row.change_ratio.startsWith('-') ? 'text-red-500' : 'text-green-500'">
+            <span class="text-red-500">
               {{ scope.row.price }}
             </span>
           </template>
@@ -38,7 +38,7 @@
         </el-table-column>
         <el-table-column prop="main_flow" label="主力资金流入" width="150" sortable>
           <template #default="scope">
-            <span :class="scope.row.main_flow > 0 ? 'text-green-500' : 'text-red-500'" class="font-bold">
+            <span class="text-red-500 font-bold">
               {{ scope.row.main_flow_text }}
             </span>
           </template>
@@ -95,7 +95,7 @@ const fetchData = async () => {
     const res = await getCapitalFlowData(currentPage.value, pageSize.value)
     if (res.success) {
       tableData.value = res.data
-      total.value = res.total
+      total.value = res.count
     }
   } catch (error) {
     console.error('Failed to fetch capital flow data:', error)

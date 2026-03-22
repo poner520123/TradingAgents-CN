@@ -99,11 +99,10 @@ export interface CrossAnalysisListResponse {
  */
 export function getPopularityData(page: number = 1, pageSize: number = 20) {
   return request<PopularityListResponse>({
-    url: '/api/astock/popularity',
+    url: '/api/ranking/popularity',
     method: 'get',
     params: {
-      page,
-      page_size: pageSize
+      limit: pageSize
     }
   })
 }
@@ -115,11 +114,10 @@ export function getPopularityData(page: number = 1, pageSize: number = 20) {
  */
 export function getCapitalFlowData(page: number = 1, pageSize: number = 20) {
   return request<CapitalFlowListResponse>({
-    url: '/api/astock/capital-flow',
+    url: '/api/ranking/fund',
     method: 'get',
     params: {
-      page,
-      page_size: pageSize
+      limit: pageSize
     }
   })
 }

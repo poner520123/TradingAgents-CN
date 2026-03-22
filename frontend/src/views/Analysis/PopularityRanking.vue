@@ -29,7 +29,7 @@
         </el-table-column>
         <el-table-column prop="price" label="价格" width="100" sortable>
           <template #default="scope">
-            <span :class="scope.row.change_ratio.startsWith('-') ? 'text-red-500' : 'text-green-500'">
+            <span class="text-red-500">
               {{ scope.row.price }}
             </span>
           </template>
@@ -44,9 +44,9 @@
         <el-table-column prop="rank_change" label="排名变化" width="100">
           <template #default="scope">
             <span v-if="scope.row.rank_change">
-              <el-icon v-if="scope.row.rank_change < 0" class="text-green-500"><ArrowDown /></el-icon>
+              <el-icon v-if="scope.row.rank_change < 0" class="text-red-500"><ArrowDown /></el-icon>
               <el-icon v-else-if="scope.row.rank_change > 0" class="text-red-500"><ArrowUp /></el-icon>
-              <span :class="scope.row.rank_change < 0 ? 'text-green-500' : (scope.row.rank_change > 0 ? 'text-red-500' : '')">
+              <span class="text-red-500">
                 {{ scope.row.rank_change < 0 ? Math.abs(scope.row.rank_change) : `+${scope.row.rank_change}` }}
               </span>
             </span>
@@ -105,7 +105,7 @@ const fetchData = async () => {
     const res = await getPopularityData(currentPage.value, pageSize.value)
     if (res.success) {
       tableData.value = res.data
-      total.value = res.total
+      total.value = res.count
     }
   } catch (error) {
     console.error('Failed to fetch popularity data:', error)

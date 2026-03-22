@@ -32,11 +32,24 @@
         v-for="stock in randomStocks"
         :key="stock.stock_code || stock.stock_name"
         class="stock-item"
+        :class="{ 'limit-up': stock.limit_up === '1' }"
         @click="goToStockAnalysis(stock)"
       >
         <div class="stock-info">
-          <div class="stock-name">{{ stock.stock_name }}</div>
+          <div class="stock-name">
+            {{ stock.stock_name }}
+            <span v-if="stock.limit_up === '1'" class="limit-up-badge">
+              <el-icon><Top /></el-icon>
+              涨停
+            </span>
+          </div>
           <div class="stock-code">{{ stock.stock_code || '未知' }}</div>
+        </div>
+        <div class="stock-details">
+          <div class="stock-increase" :class="{ 'increase-up': parseFloat(stock.increase) > 0 }">
+            {{ stock.increase }}%
+          </div>
+          <div class="stock-reason">{{ stock.reason || '无' }}</div>
         </div>
         <div class="stock-time">
           {{ formatTime(stock.crawled_at || stock.time) }}
@@ -57,7 +70,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Refresh, Plus } from '@element-plus/icons-vue'
+import { Refresh, Plus, Top } from '@element-plus/icons-vue'
 import { getCrawlerData, type CrawlerData } from '@/api/crawler'
 import { favoritesApi } from '@/api/favorites'
 import { ElMessage } from 'element-plus'
@@ -264,12 +277,22 @@ onUnmounted(() => {
     cursor: pointer;
     transition: all 0.3s ease;
     background-color: var(--el-fill-color-blank);
+    position: relative;
 
     &:hover {
       border-color: var(--el-color-primary);
       background-color: var(--el-color-primary-light-9);
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    &.limit-up {
+      border-color: #f56c6c;
+      background-color: rgba(245, 108, 108, 0.05);
+
+      .stock-name {
+        color: #f56c6c;
+      }
     }
 
     .stock-info {
@@ -283,12 +306,53 @@ onUnmounted(() => {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .limit-up-badge {
+        background-color: #f56c6c;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 2px;
       }
 
       .stock-code {
         font-size: 12px;
         color: var(--el-text-color-secondary);
       }
+    }
+
+    .stock-details {
+      margin-bottom: 8px;
+    }
+
+    .stock-increase {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--el-text-color-regular);
+      margin-bottom: 4px;
+
+      &.increase-up {
+        color: #f56c6c;
+      }
+    }
+
+    .stock-reason {
+      font-size: 12px;
+      color: var(--el-text-color-placeholder);
+      line-height: 1.4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
     }
 
     .stock-time {

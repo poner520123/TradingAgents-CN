@@ -65,6 +65,7 @@ from app.routers.notifications import router as notifications_router
 from app.routers.websocket_notifications import router as websocket_notifications_router
 from app.routers.scheduler import router as scheduler_router
 from app.routers.astock import router as astock_router
+from app.routers.ranking import router as ranking_router
 
 # Alias for backward compatibility
 auth = auth_router
@@ -707,6 +708,13 @@ async def lifespan(app: FastAPI):
         # 立即执行一次股票筛选 - 移到后台任务执行，避免阻塞服务器启动
         asyncio.create_task(run_stock_selector())
 
+        # ==================== 排行数据爬虫配置 ====================
+        logger.info("配置排行数据爬虫...")
+        from app.services.ranking_scheduler import ranking_scheduler
+        # 启动排行数据定时调度器
+        ranking_scheduler.start()
+        logger.info("✅ 排行数据定时调度器已启动: 每 10 分钟执行一次")
+
         # ==================== 港股/美股数据配置 ====================
         # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
         logger.info("🇭🇰 港股数据采用按需获取+缓存模式")
@@ -923,6 +931,9 @@ app.include_router(astock_router, prefix="/api", tags=["astock"])
 
 # 股票名称代码映射路由
 app.include_router(stock_map_router, prefix="/api", tags=["stock-map"])
+
+# 排行数据路由
+app.include_router(ranking_router, prefix="/api/ranking", tags=["ranking"])
 
 
 @app.get("/")

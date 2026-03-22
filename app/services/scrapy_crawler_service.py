@@ -341,19 +341,58 @@ class ScrapyCrawlerService:
         return data, total
     
     def get_expert_ranking_data(self, page=1, page_size=20):
-        """Get paginated expert ranking data."""
-        skip = (page - 1) * page_size
-        total = self.expert_ranking_collection.count_documents({})
-        cursor = self.expert_ranking_collection.find()
-        cursor = cursor.sort("success_rate", DESCENDING).skip(skip).limit(page_size)
+        """Get paginated expert ranking data with deduplication."""
+        from datetime import datetime
         
-        data = list(cursor)
+        # Get all expert ranking data first for de-duplication
+        cursor = self.expert_ranking_collection.find()
+        all_data = list(cursor)
+        
         # Convert ObjectId to string
-        for d in data:
+        for d in all_data:
             if '_id' in d:
                 d['_id'] = str(d['_id'])
         
-        return data, total
+        # De-duplicate based on stock code - only keep the latest record for each stock code
+        # Priority: 1. Records with stock code 2. Newest record based on crawled_at/analysis_time
+        unique_items = {}
+        for item in all_data:
+            stock_code = item.get('code', '')
+            
+            # Only process records with stock code (user requirement: all records must have stock code)
+            if not stock_code:
+                continue
+                
+            # Check if this stock code already exists
+            if stock_code in unique_items:
+                existing_item = unique_items[stock_code]
+                
+                # Compare crawled_at first (more reliable than analysis_time)
+                existing_crawled = existing_item.get('crawled_at', datetime.min)
+                current_crawled = item.get('crawled_at', datetime.min)
+                
+                if current_crawled > existing_crawled:
+                    unique_items[stock_code] = item
+                # Fall back to analysis_time if crawled_at is not available
+                elif existing_crawled == current_crawled:
+                    existing_time = existing_item.get('analysis_time', '')
+                    current_time = item.get('analysis_time', '')
+                    if current_time > existing_time:
+                        unique_items[stock_code] = item
+            else:
+                # Add new item if stock code doesn't exist
+                unique_items[stock_code] = item
+        
+        # Convert back to list and sort by success_rate in descending order
+        unique_data = list(unique_items.values())
+        unique_data.sort(key=lambda x: x.get('success_rate', 0), reverse=True)
+        total = len(unique_data)
+        
+        # Apply pagination
+        skip = (page - 1) * page_size
+        paginated_data = unique_data[skip:skip + page_size]
+        
+        return paginated_data, total
     
     def get_cross_analysis_data(self, page=1, page_size=20):
         """Get cross analysis data with popularity and capital flow ranks."""
