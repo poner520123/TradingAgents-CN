@@ -80,7 +80,7 @@ const router = useRouter()
 
 // 配置项
 const REFRESH_INTERVAL = 5 * 60 * 1000 // 5分钟
-const MAX_STOCKS = 50 // 从最新50条中选择
+const MAX_STOCKS = 100 // 从最新100条中选择
 const DISPLAY_COUNT = 10 // 显示10条
 
 // 响应式数据
@@ -108,6 +108,53 @@ const getRandomElements = <T>(arr: T[], count: number): T[] => {
   
   const shuffled = [...arr].sort(() => Math.random() - 0.5)
   return shuffled.slice(0, count)
+}
+
+// 判断是否突破压力位
+const isBreakthrough = (stock: CrawlerData): boolean => {
+  // 获取涨幅百分比（去除%号）
+  const increase = parseFloat(stock.increase.replace('%', ''))
+  
+  // 条件1: 涨幅在2%-8%之间，处于突破阶段但未涨停
+  if (increase < 2 || increase > 8) {
+    return false
+  }
+  
+  // 条件2: 判断是否有突破特征（这里根据数据特征进行判断）
+  // 可以根据其他字段特征来判断是否突破平台、左峰或凹间峰
+  // 目前根据涨幅和时间来判断
+  
+  return true
+}
+
+// 计算涨停概率分数
+const calculateLimitUpScore = (stock: CrawlerData): number => {
+  let score = 0
+  
+  // 获取涨幅百分比
+  const increase = parseFloat(stock.increase.replace('%', ''))
+  
+  // 涨幅越大，涨停概率越高（2%-8%之间）
+  if (increase >= 2 && increase <= 8) {
+    score += increase * 10
+  }
+  
+  // 突破压力位的股票加分
+  if (isBreakthrough(stock)) {
+    score += 50
+  }
+  
+  // 最新的数据加分
+  const time = new Date(stock.crawled_at || stock.time).getTime()
+  const now = new Date().getTime()
+  const hoursDiff = (now - time) / (1000 * 60 * 60)
+  
+  // 时间越新，分数越高（最近1小时内的股票加分）
+  if (hoursDiff <= 1) {
+    score += (1 - hoursDiff) * 20
+  }
+  
+  return score
 }
 
 // 加载爬虫数据
@@ -138,17 +185,22 @@ const loadCrawlerData = async () => {
       // 将Map转换为数组
       const uniqueStocksArray = Array.from(uniqueStocks.values())
       
-      // 随机选择DISPLAY_COUNT个股票
-      const selected = getRandomElements(uniqueStocksArray, DISPLAY_COUNT)
-      // 然后按时间倒序排序，确保显示时从左到右从上到下时间由近到远排列
-      randomStocks.value = selected.sort((a, b) => {
-        const timeA = new Date(a.crawled_at || a.time).getTime()
-        const timeB = new Date(b.crawled_at || b.time).getTime()
-        return timeB - timeA
-      })
+      // 筛选出突破压力位的股票
+      const breakthroughStocks = uniqueStocksArray.filter(stock => isBreakthrough(stock))
       
-      // 更新allStocks为去重后的数据
-      allStocks.value = uniqueStocksArray
+      // 计算每个股票的涨停概率分数并排序
+      const sortedStocks = breakthroughStocks
+        .map(stock => ({
+          ...stock,
+          score: calculateLimitUpScore(stock)
+        }))
+        .sort((a, b) => b.score - a.score)
+      
+      // 选择分数最高的前DISPLAY_COUNT个股票
+      randomStocks.value = sortedStocks.slice(0, DISPLAY_COUNT)
+      
+      // 更新allStocks为筛选后的数据
+      allStocks.value = sortedStocks
     }
   } catch (error) {
     console.error('加载爬虫数据失败:', error)
