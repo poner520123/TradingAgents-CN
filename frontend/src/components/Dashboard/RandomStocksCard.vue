@@ -46,8 +46,8 @@
           <div class="stock-code">{{ stock.stock_code || '未知' }}</div>
         </div>
         <div class="stock-details">
-          <div class="stock-increase" :class="{ 'increase-up': parseFloat(stock.increase) > 0 }">
-            {{ stock.increase }}%
+          <div class="stock-increase" :class="{ 'increase-up': parseFloat(stock.increase.replace('%', '')) > 0 }">
+            {{ stock.increase }}
           </div>
           <div class="stock-reason">{{ stock.reason || '无' }}</div>
         </div>
