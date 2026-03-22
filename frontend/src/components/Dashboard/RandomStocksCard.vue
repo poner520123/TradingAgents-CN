@@ -32,13 +32,13 @@
         v-for="stock in randomStocks"
         :key="stock.stock_code || stock.stock_name"
         class="stock-item"
-        :class="{ 'limit-up': stock.limit_up === '1' }"
+        :class="{ 'limit-up': stock.limit_up === '1' || parseFloat(stock.increase.replace('%', '')) >= 9.0 }"
         @click="goToStockAnalysis(stock)"
       >
         <div class="stock-info">
           <div class="stock-name">
             {{ stock.stock_name }}
-            <span v-if="stock.limit_up === '1'" class="limit-up-badge">
+            <span v-if="stock.limit_up === '1' || parseFloat(stock.increase.replace('%', '')) >= 9.0" class="limit-up-badge">
               <el-icon><Top /></el-icon>
               涨停
             </span>
