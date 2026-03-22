@@ -693,3 +693,7 @@ class CrawlerService:
             # 爬取完成已通过日志记录，无需额外通知
         
         return self.__class__.total_saved
+
+
+# 单例实例
+crawler_service = CrawlerService()

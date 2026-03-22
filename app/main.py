@@ -74,6 +74,7 @@ from app.routers.notifications import router as notifications_router
 from app.routers.websocket_notifications import router as websocket_notifications_router
 from app.routers.system_config import router as system_config_router
 from app.routers.paper import router as paper_router
+from app.routers.advanced_screening import router as advanced_screening_router
 from app.services.basics_sync_service import get_basics_sync_service
 from app.services.multi_source_basics_sync_service import MultiSourceBasicsSyncService
 from app.services.scheduler_service import set_scheduler_instance
@@ -934,6 +935,9 @@ app.include_router(stock_map_router, prefix="/api", tags=["stock-map"])
 
 # 排行数据路由
 app.include_router(ranking_router, prefix="/api/ranking", tags=["ranking"])
+
+# 高级筛选路由
+app.include_router(advanced_screening_router)
 
 
 @app.get("/")
