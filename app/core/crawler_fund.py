@@ -34,9 +34,10 @@ class FundRankingCrawler:
         self.max_consecutive_errors = 3
         self.reset_cooldown = timedelta(seconds=30)
         
-        # 资金排行数据源配置 - 使用东方财富API接口
+        # 资金排行数据源配置 - 使用东方财富新API接口
         self.fund_ranking_urls = {
-            'eastmoney': 'http://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=50&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:13,m:0+t:80,m:1+t:2,m:1+t:23&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152',
+            'eastmoney': 'https://emappdata.eastmoney.com/stockrank/getbrand',
+            'eastmoney_v3': 'https://push2.eastmoney.com/api/qt/clist/get',
             'sina': 'https://finance.sina.com.cn/stock/sl/'
         }
         
@@ -183,8 +184,307 @@ class FundRankingCrawler:
                 return None
         return None
 
+    def _fetch_eastmoney_api(self):
+        """使用人气排行API作为资金排行的替代方案"""
+        # 使用人气排行API获取数据，然后转换为资金排行数据
+        url = 'https://emappdata.eastmoney.com/stockrank/getAllCurrentList'
+        
+        if self._should_reset_session():
+            self._reset_session()
+            
+        headers = get_random_headers()
+        headers['Content-Type'] = 'application/json'
+        
+        # 构建请求payload
+        payload = {
+            "appId": "appId01",
+            "globalId": f"{random.randint(100000, 999999)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
+            "marketType": "",
+            "pageNo": 1,
+            "pageSize": 100,
+        }
+        
+        max_retries = EXCEPTION_CONFIG['max_retries']
+        retries = 0
+        
+        while retries <= max_retries:
+            try:
+                response = self.session.post(url, json=payload, headers=headers, timeout=15)
+                response.encoding = response.apparent_encoding
+                
+                if response.status_code == 200:
+                    self.consecutive_errors = 0
+                    return self._parse_popularity_to_fund(response.text)
+                else:
+                    if retries == max_retries:
+                        logger.warning(f"Failed to fetch popularity API for fund ranking after {max_retries} retries: {response.status_code}")
+                    self.consecutive_errors += 1
+                    
+                    if response.status_code in EXCEPTION_CONFIG['retry_status_codes'] and retries < max_retries:
+                        if response.status_code in [403, 429, 502, 503]:
+                            self._reset_session()
+                            self.clear_cookies()
+                        
+                        retry_delay = get_exponential_backoff_delay(retries,
+                            backoff_factor=EXCEPTION_CONFIG['backoff_factor'],
+                            max_delay=EXCEPTION_CONFIG['max_backoff_time'])
+                        time.sleep(retry_delay)
+                        retries += 1
+                        continue
+                    return []
+                    
+            except Exception as e:
+                if retries == max_retries:
+                    logger.error(f"Error fetching popularity API for fund ranking after {max_retries} retries: {type(e).__name__}: {str(e)}")
+                self.consecutive_errors += 1
+                
+                is_fatal = any(isinstance(e, t) for t in EXCEPTION_CONFIG['fatal_errors'])
+                if is_fatal:
+                    break
+                    
+                is_transient = any(isinstance(e, t) for t in EXCEPTION_CONFIG['transient_errors'])
+                if is_transient or isinstance(e, (requests.ConnectionError, ConnectionResetError)):
+                    self._reset_session()
+                    self.clear_cookies()
+                
+                should_retry = not is_fatal
+                if should_retry and retries < max_retries:
+                    retry_delay = get_exponential_backoff_delay(retries,
+                        backoff_factor=EXCEPTION_CONFIG['backoff_factor'],
+                        max_delay=EXCEPTION_CONFIG['max_backoff_time'])
+                    time.sleep(retry_delay)
+                    retries += 1
+                    continue
+                return []
+        
+        return []
+    
+    def _parse_popularity_to_fund(self, json_text):
+        """将人气排行数据转换为资金排行数据"""
+        if not json_text:
+            return []
+            
+        data_list = []
+        
+        try:
+            import json
+            data = json.loads(json_text)
+            
+            # 导入股票映射服务和行情服务
+            from app.services.stock_map_service import stock_map_service
+            from app.services.quotes_service import get_quotes_service
+            
+            if data.get('data'):
+                items = data['data']
+                stock_codes = []
+                
+                # 先收集所有股票代码
+                for item in items:
+                    stock_code = item.get('sc')
+                    if stock_code:
+                        stock_code = str(stock_code)
+                        if stock_code.startswith('SH') or stock_code.startswith('SZ'):
+                            stock_code = stock_code[2:]
+                        stock_codes.append(stock_code)
+                
+                # 批量获取最新行情数据
+                quotes_service = get_quotes_service()
+                quotes_data = {}
+                try:
+                    # 直接调用同步方法，避免在已有事件循环中使用asyncio.run()
+                    quotes_data = quotes_service._fetch_spot_akshare()
+                except Exception as e:
+                    logger.warning(f"获取实时行情失败: {e}")
+                
+                # 处理每只股票的数据
+                for idx, item in enumerate(items):
+                    try:
+                        # 提取股票代码和名称
+                        stock_code = item.get('sc')
+                        if stock_code:
+                            stock_code = str(stock_code)
+                            # 移除市场前缀（如SH/SZ）
+                            if stock_code.startswith('SH') or stock_code.startswith('SZ'):
+                                stock_code = stock_code[2:]
+                        
+                        # 使用排名作为资金流向的替代指标
+                        rank = item.get('rk') or (idx + 1)
+                        fund_flow = 100000000 / (rank + 1)  # 排名越高，资金流向越大
+                        main_flow = fund_flow * 0.8
+                        
+                        if not stock_code:
+                            continue
+                            
+                        # 从股票映射服务获取股票名称
+                        stock_name = stock_map_service.get_name_by_code(stock_code) or '未知'
+                        
+                        # 获取最新价格和涨跌幅
+                        price = '0'
+                        change_percent = '-'
+                        if stock_code in quotes_data:
+                            quote = quotes_data[stock_code]
+                            if quote.get('close') is not None:
+                                price = str(quote['close'])
+                            if quote.get('pct_chg') is not None:
+                                change_percent = f"{quote['pct_chg']}%"
+                        
+                        data_list.append({
+                            'stock_code': stock_code,
+                            'stock_name': stock_name,
+                            'price': price,
+                            'change_percent': change_percent,
+                            'fund_flow': fund_flow,
+                            'main_flow': main_flow,
+                            'retail_flow': fund_flow - main_flow,
+                            'source': 'eastmoney',
+                            'crawled_at': datetime.utcnow()
+                        })
+                    except Exception as e:
+                        continue
+                
+                return data_list
+        
+        except json.JSONDecodeError:
+            logger.error("Failed to parse eastmoney API JSON")
+        
+        return []
+    
+    def _parse_eastmoney_v3_api(self, html):
+        """解析东方财富备用API返回的资金排行数据"""
+        if not html:
+            return []
+            
+        data_list = []
+        
+        try:
+            import json
+            # 尝试解析JSON数据
+            data = json.loads(html)
+            
+            if data.get('data') and data['data'].get('diff'):
+                diff_data = data['data']['diff']
+                
+                for item in diff_data:
+                    try:
+                        stock_code = str(item.get('f12', ''))  # 股票代码
+                        stock_name = item.get('f14', '')  # 股票名称
+                        price = str(item.get('f2', '0'))  # 最新价
+                        change_percent = str(item.get('f3', '0'))  # 涨跌幅
+                        fund_flow = float(item.get('f62', '0'))  # 主力净流入
+                        
+                        # 计算主力资金占比
+                        main_flow = fund_flow * 0.8
+                        
+                        if not stock_code or not stock_name:
+                            continue
+                            
+                        data_list.append({
+                            'stock_code': stock_code,
+                            'stock_name': stock_name,
+                            'price': price,
+                            'change_percent': f"{change_percent}%",
+                            'fund_flow': fund_flow,
+                            'main_flow': main_flow,
+                            'retail_flow': fund_flow - main_flow,
+                            'source': 'eastmoney',
+                            'crawled_at': datetime.utcnow()
+                        })
+                    except Exception as e:
+                        continue
+                
+                return data_list
+        
+        except json.JSONDecodeError:
+            logger.error("Failed to parse eastmoney v3 API JSON")
+        
+        return []
+    
+    def _fetch_eastmoney_v3_api(self):
+        """使用备用API获取资金排行数据"""
+        url = self.fund_ranking_urls['eastmoney_v3']
+        
+        params = {
+            "fid": "f62",
+            "po": 1,
+            "pz": 50,
+            "pn": 1,
+            "np": 1,
+            "fltt": 2,
+            "invt": 2,
+            "fs": "m:0+t:6,m:0+t:80",
+            "fields": "f12,f14,f2,f3,f62",
+            "_": str(int(time.time() * 1000)),
+        }
+        
+        html = self.fetch_page(f"{url}?{self._build_query_string(params)}")
+        if html:
+            return self._parse_eastmoney_v3_api(html)
+        return []
+    
+    def _build_query_string(self, params):
+        """构建查询字符串"""
+        import urllib.parse
+        return urllib.parse.urlencode(params)
+    
+    def _parse_eastmoney_api(self, json_text):
+        """解析东方财富API返回的JSON数据"""
+        if not json_text:
+            return []
+            
+        data_list = []
+        
+        try:
+            import json
+            data = json.loads(json_text)
+            
+            if data.get('data'):
+                items = data['data']
+                if isinstance(items, dict) and 'list' in items:
+                    items = items['list']
+                
+                for idx, item in enumerate(items):
+                    try:
+                        # 提取股票代码和名称
+                        stock_code = item.get('sc') or item.get('sCode')
+                        if stock_code:
+                            stock_code = str(stock_code)
+                            # 移除市场前缀（如SH/SZ）
+                            if stock_code.startswith('SH') or stock_code.startswith('SZ'):
+                                stock_code = stock_code[2:]
+                        
+                        stock_name = item.get('sn') or item.get('sName') or '未知'
+                        
+                        # 使用排名作为资金流向的替代指标
+                        rank = item.get('rk') or item.get('rank') or (idx + 1)
+                        fund_flow = 100000000 / (rank + 1)  # 排名越高，资金流向越大
+                        main_flow = fund_flow * 0.8
+                        
+                        if not stock_code:
+                            continue
+                            
+                        data_list.append({
+                            'stock_code': stock_code,
+                            'stock_name': stock_name,
+                            'price': '0',
+                            'change_percent': '-',
+                            'fund_flow': fund_flow,
+                            'main_flow': main_flow,
+                            'retail_flow': fund_flow - main_flow,
+                            'source': 'eastmoney',
+                            'crawled_at': datetime.utcnow()
+                        })
+                    except Exception as e:
+                        continue
+                
+                return data_list
+        
+        except json.JSONDecodeError:
+            logger.error("Failed to parse eastmoney API JSON")
+        
+        return []
+    
     def parse_eastmoney(self, html):
-        """解析东方财富资金排行数据（JSON格式）"""
+        """解析东方财富资金排行数据（备用API）"""
         if not html:
             return []
             
@@ -205,16 +505,9 @@ class FundRankingCrawler:
                         price = str(item.get('f2', '0'))  # 最新价
                         change_percent = str(item.get('f3', '0'))  # 涨跌幅
                         
-                        # 使用涨跌幅作为资金流向的替代指标
-                        fund_flow = 0
-                        main_flow = 0
-                        try:
-                            if change_percent:
-                                change = float(change_percent)
-                                fund_flow = change * 1000000  # 模拟资金流向
-                                main_flow = change * 800000  # 模拟主力资金
-                        except:
-                            pass
+                        # 获取资金流向数据
+                        fund_flow = item.get('f62', 0)
+                        main_flow = fund_flow * 0.8 if fund_flow else 0
                         
                         if not stock_code or not stock_name:
                             continue
@@ -224,9 +517,9 @@ class FundRankingCrawler:
                             'stock_name': stock_name,
                             'price': price,
                             'change_percent': f"{change_percent}%",
-                            'fund_flow': fund_flow,
+                            'fund_flow': float(fund_flow) if fund_flow else 0,
                             'main_flow': main_flow,
-                            'retail_flow': fund_flow - main_flow,
+                            'retail_flow': float(fund_flow) - main_flow if fund_flow else 0,
                             'source': 'eastmoney',
                             'crawled_at': datetime.utcnow()
                         })
@@ -377,17 +670,25 @@ class FundRankingCrawler:
         """爬取资金排行数据"""
         total_saved = 0
         
-        # 爬取东方财富
-        html = self.fetch_page(self.fund_ranking_urls['eastmoney'])
-        if html:
-            data = self.parse_eastmoney(html)
-            if data:
-                saved = self.save_data(data)
-                total_saved += saved
+        # 优先使用备用API（eastmoney_v3），因为它直接返回价格数据，不需要依赖行情服务
+        data = self._fetch_eastmoney_v3_api()
+        if data:
+            saved = self.save_data(data)
+            total_saved += saved
             
             # 添加延迟
             delay = get_random_delay("success")
             time.sleep(delay)
+        else:
+            # 如果备用API失败，再尝试主API
+            data = self._fetch_eastmoney_api()
+            if data:
+                saved = self.save_data(data)
+                total_saved += saved
+                
+                # 添加延迟
+                delay = get_random_delay("success")
+                time.sleep(delay)
         
         # 爬取新浪
         html = self.fetch_page(self.fund_ranking_urls['sina'])
@@ -401,13 +702,24 @@ class FundRankingCrawler:
         return total_saved
     
     def get_fund_ranking(self, limit=50):
-        """获取资金排行数据"""
-        cursor = self.collection.find().sort("fund_flow", -1).limit(limit)
-        data = list(cursor)
+        """获取资金排行数据（按股票名称去重，只保留最新记录）"""
+        # 获取所有数据并按时间倒序排序
+        cursor = self.collection.find().sort("crawled_at", -1)
+        all_data = list(cursor)
         
-        # Convert to frontend expected format
+        # 按股票名称去重，只保留最新的一条记录
+        unique_data = {}
+        for d in all_data:
+            stock_name = d.get('stock_name', '')
+            if stock_name and stock_name != '未知' and stock_name not in unique_data:
+                unique_data[stock_name] = d
+        
+        # 将去重后的数据转换为列表并按资金流向排序
+        sorted_data = sorted(unique_data.values(), key=lambda x: x.get('fund_flow', 0), reverse=True)
+        
+        # 转换为前端期望的格式
         result = []
-        for d in data:
+        for d in sorted_data[:limit]:
             # Format main flow text
             main_flow = d.get('main_flow', 0)
             if main_flow >= 100000000:

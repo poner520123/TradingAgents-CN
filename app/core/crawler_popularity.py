@@ -34,9 +34,10 @@ class PopularityRankingCrawler:
         self.max_consecutive_errors = 3
         self.reset_cooldown = timedelta(seconds=30)
         
-        # 人气排行数据源配置 - 使用专门的API接口
+        # 人气排行数据源配置 - 使用东方财富新API接口
         self.popularity_ranking_urls = {
-            'eastmoney': 'http://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=50&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:13,m:0+t:80,m:1+t:2,m:1+t:23&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152',
+            'eastmoney': 'https://emappdata.eastmoney.com/stockrank/getAllCurrentList',
+            'eastmoney_v3': 'https://push2.eastmoney.com/api/qt/clist/get',
             'sina': 'https://finance.sina.com.cn/stock/sl/'
         }
         
@@ -183,8 +184,219 @@ class PopularityRankingCrawler:
                 return None
         return None
 
+    def _fetch_eastmoney_api(self):
+        """使用POST请求获取东方财富人气排行数据"""
+        url = self.popularity_ranking_urls['eastmoney']
+        logger.info(f"开始调用东方财富人气排行API: {url}")
+        
+        if self._should_reset_session():
+            self._reset_session()
+            
+        headers = get_random_headers()
+        headers['Content-Type'] = 'application/json'
+        
+        # 构建请求payload
+        payload = {
+            "appId": "appId01",
+            "globalId": f"{random.randint(100000, 999999)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
+            "marketType": "",
+            "pageNo": 1,
+            "pageSize": 100,
+        }
+        
+        max_retries = EXCEPTION_CONFIG['max_retries']
+        retries = 0
+        
+        while retries <= max_retries:
+            try:
+                logger.info(f"发送POST请求到东方财富API，尝试次数: {retries+1}/{max_retries+1}")
+                response = self.session.post(url, json=payload, headers=headers, timeout=15)
+                response.encoding = response.apparent_encoding
+                
+                if response.status_code == 200:
+                    logger.info(f"东方财富API返回成功，状态码: {response.status_code}")
+                    logger.info(f"返回数据长度: {len(response.text)}")
+                    # 打印前100个字符用于调试
+                    if len(response.text) > 100:
+                        logger.info(f"返回数据预览: {response.text[:100]}...")
+                    self.consecutive_errors = 0
+                    result = self._parse_eastmoney_api(response.text)
+                    logger.info(f"解析完成，返回 {len(result)} 条数据")
+                    return result
+                else:
+                    logger.warning(f"东方财富API返回错误状态码: {response.status_code}")
+                    if retries == max_retries:
+                        logger.warning(f"Failed to fetch popularity ranking API after {max_retries} retries: {response.status_code}")
+                    self.consecutive_errors += 1
+                    
+                    if response.status_code in EXCEPTION_CONFIG['retry_status_codes'] and retries < max_retries:
+                        if response.status_code in [403, 429, 502, 503]:
+                            self._reset_session()
+                            self.clear_cookies()
+                        
+                        retry_delay = get_exponential_backoff_delay(retries,
+                            backoff_factor=EXCEPTION_CONFIG['backoff_factor'],
+                            max_delay=EXCEPTION_CONFIG['max_backoff_time'])
+                        logger.info(f"等待 {retry_delay} 秒后重试")
+                        time.sleep(retry_delay)
+                        retries += 1
+                        continue
+                    logger.info("东方财富API调用失败，返回空列表")
+                    return []
+                    
+            except Exception as e:
+                logger.error(f"东方财富API调用异常: {type(e).__name__}: {str(e)}")
+                if retries == max_retries:
+                    logger.error(f"Error fetching popularity ranking API after {max_retries} retries: {type(e).__name__}: {str(e)}")
+                self.consecutive_errors += 1
+                
+                is_fatal = any(isinstance(e, t) for t in EXCEPTION_CONFIG['fatal_errors'])
+                if is_fatal:
+                    logger.error("遇到致命错误，停止重试")
+                    break
+                    
+                is_transient = any(isinstance(e, t) for t in EXCEPTION_CONFIG['transient_errors'])
+                if is_transient or isinstance(e, (requests.ConnectionError, ConnectionResetError)):
+                    self._reset_session()
+                    self.clear_cookies()
+                
+                should_retry = not is_fatal
+                if should_retry and retries < max_retries:
+                    retry_delay = get_exponential_backoff_delay(retries,
+                        backoff_factor=EXCEPTION_CONFIG['backoff_factor'],
+                        max_delay=EXCEPTION_CONFIG['max_backoff_time'])
+                    logger.info(f"等待 {retry_delay} 秒后重试")
+                    time.sleep(retry_delay)
+                    retries += 1
+                    continue
+                logger.info("东方财富API调用失败，返回空列表")
+                return []
+        
+        # 如果新API失败，尝试备用API
+        logger.info("东方财富新API调用失败，尝试备用API")
+        return self._fetch_eastmoney_v3_api()
+    
+    def _fetch_eastmoney_v3_api(self):
+        """使用备用API获取人气排行数据"""
+        url = self.popularity_ranking_urls['eastmoney_v3']
+        
+        params = {
+            "fid": "f8",
+            "po": 1,
+            "pz": 50,
+            "pn": 1,
+            "np": 1,
+            "fltt": 2,
+            "invt": 2,
+            "fs": "m:0+t:6,m:0+t:80",
+            "fields": "f12,f14,f2,f3,f8",
+            "_": str(int(time.time() * 1000)),
+        }
+        
+        html = self.fetch_page(f"{url}?{self._build_query_string(params)}")
+        if html:
+            return self.parse_eastmoney(html)
+        return []
+    
+    def _build_query_string(self, params):
+        """构建查询字符串"""
+        import urllib.parse
+        return urllib.parse.urlencode(params)
+    
+    def _parse_eastmoney_api(self, json_text):
+        """解析东方财富API返回的JSON数据"""
+        if not json_text:
+            return []
+            
+        data_list = []
+        
+        try:
+            import json
+            data = json.loads(json_text)
+            
+            # 导入股票映射服务和行情服务
+            from app.services.stock_map_service import stock_map_service
+            from app.services.quotes_service import get_quotes_service
+            
+            if data.get('data'):
+                items = data['data']
+                stock_codes = []
+                
+                # 先收集所有股票代码
+                for item in items:
+                    stock_code = item.get('sc')
+                    if stock_code:
+                        stock_code = str(stock_code)
+                        if stock_code.startswith('SH') or stock_code.startswith('SZ'):
+                            stock_code = stock_code[2:]
+                        stock_codes.append(stock_code)
+                
+                # 批量获取最新行情数据
+                quotes_service = get_quotes_service()
+                quotes_data = {}
+                try:
+                    logger.info(f"开始获取实时行情数据，股票数量: {len(stock_codes)}")
+                    # 直接调用同步方法获取行情数据
+                    quotes_data = quotes_service._fetch_spot_akshare()
+                    logger.info(f"行情数据获取完成，返回 {len(quotes_data)} 条数据")
+                    # 打印前几个股票的行情数据
+                    for i, (code, data) in enumerate(list(quotes_data.items())[:3]):
+                        logger.info(f"股票 {code}: 价格={data.get('close')}, 涨跌幅={data.get('pct_chg')}%")
+                except Exception as e:
+                    logger.error(f"获取实时行情失败: {type(e).__name__}: {str(e)}")
+                
+                # 处理每只股票的数据
+                for idx, item in enumerate(items):
+                    try:
+                        # 提取股票代码和名称
+                        stock_code = item.get('sc')
+                        if stock_code:
+                            stock_code = str(stock_code)
+                            # 移除市场前缀（如SH/SZ）
+                            if stock_code.startswith('SH') or stock_code.startswith('SZ'):
+                                stock_code = stock_code[2:]
+                        
+                        # 使用排名作为人气得分
+                        rank = item.get('rk') or (idx + 1)
+                        popularity_score = 10000 / (rank + 1)  # 排名越高，人气得分越高
+                        
+                        if not stock_code:
+                            continue
+                            
+                        # 从股票映射服务获取股票名称
+                        stock_name = stock_map_service.get_name_by_code(stock_code) or '未知'
+                        
+                        # 获取最新价格和涨跌幅
+                        price = '0'
+                        change_percent = '-'
+                        if stock_code in quotes_data:
+                            quote = quotes_data[stock_code]
+                            if quote.get('close') is not None:
+                                price = str(quote['close'])
+                            if quote.get('pct_chg') is not None:
+                                change_percent = f"{quote['pct_chg']}%"
+                        
+                        data_list.append({
+                            'stock_code': stock_code,
+                            'stock_name': stock_name,
+                            'price': price,
+                            'change_percent': change_percent,
+                            'popularity_score': popularity_score,
+                            'source': 'eastmoney',
+                            'crawled_at': datetime.utcnow()
+                        })
+                    except Exception as e:
+                        continue
+                
+                return data_list
+        
+        except json.JSONDecodeError:
+            logger.error("Failed to parse eastmoney API JSON")
+        
+        return []
+    
     def parse_eastmoney(self, html):
-        """解析东方财富人气排行数据（JSON格式）"""
+        """解析东方财富人气排行数据（备用API）"""
         if not html:
             return []
             
@@ -367,17 +579,25 @@ class PopularityRankingCrawler:
         """爬取人气排行数据"""
         total_saved = 0
         
-        # 爬取东方财富
-        html = self.fetch_page(self.popularity_ranking_urls['eastmoney'])
-        if html:
-            data = self.parse_eastmoney(html)
-            if data:
-                saved = self.save_data(data)
-                total_saved += saved
+        # 优先使用备用API（eastmoney_v3），因为它直接返回价格数据，不需要依赖行情服务
+        data = self._fetch_eastmoney_v3_api()
+        if data:
+            saved = self.save_data(data)
+            total_saved += saved
             
             # 添加延迟
             delay = get_random_delay("success")
             time.sleep(delay)
+        else:
+            # 如果备用API失败，再尝试主API
+            data = self._fetch_eastmoney_api()
+            if data:
+                saved = self.save_data(data)
+                total_saved += saved
+                
+                # 添加延迟
+                delay = get_random_delay("success")
+                time.sleep(delay)
         
         # 爬取新浪
         html = self.fetch_page(self.popularity_ranking_urls['sina'])
@@ -391,13 +611,24 @@ class PopularityRankingCrawler:
         return total_saved
     
     def get_popularity_ranking(self, limit=50):
-        """获取人气排行数据"""
-        cursor = self.collection.find().sort("popularity_score", -1).limit(limit)
-        data = list(cursor)
+        """获取人气排行数据（按股票名称去重，只保留最新记录）"""
+        # 获取所有数据并按时间倒序排序
+        cursor = self.collection.find().sort("crawled_at", -1)
+        all_data = list(cursor)
         
-        # Convert to frontend expected format
+        # 按股票名称去重，只保留最新的一条记录
+        unique_data = {}
+        for d in all_data:
+            stock_name = d.get('stock_name', '')
+            if stock_name and stock_name != '未知' and stock_name not in unique_data:
+                unique_data[stock_name] = d
+        
+        # 将去重后的数据转换为列表并按人气得分排序
+        sorted_data = sorted(unique_data.values(), key=lambda x: x.get('popularity_score', 0), reverse=True)
+        
+        # 转换为前端期望的格式
         result = []
-        for i, d in enumerate(data):
+        for i, d in enumerate(sorted_data[:limit]):
             item = {
                 'rank': i + 1,
                 'code': d.get('stock_code', ''),

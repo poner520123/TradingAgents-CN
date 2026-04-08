@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 import logging
+import asyncio
 from datetime import datetime
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from app.core.config import settings
@@ -383,8 +384,10 @@ class ScrapyCrawlerService:
                 # Add new item if stock code doesn't exist
                 unique_items[stock_code] = item
         
-        # Convert back to list and sort by success_rate in descending order
+        # Convert back to list and filter records with success_rate >= 60%
         unique_data = list(unique_items.values())
+        # Filter out records with success_rate < 60%
+        unique_data = [item for item in unique_data if item.get('success_rate', 0) >= 60]
         unique_data.sort(key=lambda x: x.get('success_rate', 0), reverse=True)
         total = len(unique_data)
         
@@ -410,6 +413,9 @@ class ScrapyCrawlerService:
             if '_id' in d:
                 d['_id'] = str(d['_id'])
         
+        # First filter out records with None code to avoid validation errors
+        all_data = [item for item in all_data if item.get('code') is not None]
+        
         # De-duplicate based on expert_name and name (stock name) as unique index
         # Priority is given to records with code (stock code), and if both have code, keep the newer one
         unique_items = {}
@@ -425,11 +431,8 @@ class ScrapyCrawlerService:
                 existing_has_code = existing_item.get('code') is not None
                 current_has_code = item.get('code') is not None
                 
-                # If the existing record doesn't have code but current one does, replace it
-                if not existing_has_code and current_has_code:
-                    unique_items[unique_key] = item
                 # If both have code, keep the newer one based on crawled_at
-                elif existing_has_code and current_has_code:
+                if existing_has_code and current_has_code:
                     # Try to compare crawled_at first (more reliable than analysis_time)
                     existing_crawled = existing_item.get('crawled_at', datetime.min)
                     current_crawled = item.get('crawled_at', datetime.min)
@@ -442,7 +445,6 @@ class ScrapyCrawlerService:
                         current_time = item.get('analysis_time', '')
                         if current_time > existing_time:
                             unique_items[unique_key] = item
-                # If existing has code but current doesn't, keep existing
             else:
                 # Add new item if key doesn't exist
                 unique_items[unique_key] = item
@@ -470,14 +472,44 @@ class ScrapyCrawlerService:
         ]).limit(200))
         capital_flow_rank_map = {item['code']: i+1 for i, item in enumerate(capital_flow_data)}
         
+        # 导入同步数据库连接
+        from app.core.database import get_mongo_db_sync
+        
         # Add popularity and capital flow ranks to cross analysis data
+        final_data = []
         for item in paginated_data:
             code = item.get('code')
+            # Ensure code is not None to avoid validation errors
+            if code is None:
+                continue
+            
             # Add rank regardless of top 100 limit, will show actual rank or None if not found
             item['popularity_rank'] = popularity_rank_map.get(code)
             item['capital_flow_rank'] = capital_flow_rank_map.get(code)
+            
+            # 判断是否涨停
+            try:
+                # 使用同步数据库查询获取行情数据
+                db = get_mongo_db_sync()
+                market_quotes_collection = db['market_quotes']
+                quote = market_quotes_collection.find_one({'code': code})
+                
+                if quote and 'pct_chg' in quote and quote['pct_chg'] is not None:
+                    # 判断是否涨停（普通股票10%，科创板20%，ST股票5%）
+                    # 根据用户要求：涨幅大于9.5%即为涨停
+                    if quote['pct_chg'] >= 9.5:
+                        item['limit_up'] = True
+                    else:
+                        item['limit_up'] = False
+                else:
+                    item['limit_up'] = False
+            except Exception as e:
+                logger.error(f"获取股票{code}行情数据失败: {e}")
+                item['limit_up'] = False
+            
+            final_data.append(item)
         
-        return paginated_data, total
+        return final_data, total
     
     def get_hot_experts_data(self, limit=15):
         """Get hot experts data for dashboard.
@@ -497,12 +529,15 @@ class ScrapyCrawlerService:
         cross_data, _ = self.get_cross_analysis_data(page=1, page_size=1000)  # Get all data first
         
         # Filter data where both popularity_rank and capital_flow_rank are not None and > 0
+        # Also ensure code is not None to avoid validation errors
         filtered_data = []
         for item in cross_data:
+            code = item.get('code')
             popularity_rank = item.get('popularity_rank')
             capital_flow_rank = item.get('capital_flow_rank')
             
-            if (popularity_rank is not None and popularity_rank > 0 and
+            if (code is not None and
+                popularity_rank is not None and popularity_rank > 0 and
                 capital_flow_rank is not None and capital_flow_rank > 0):
                 # Calculate combined rank (sum of popularity and capital flow ranks)
                 item['combined_rank'] = popularity_rank + capital_flow_rank

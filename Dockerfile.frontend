@@ -2,7 +2,7 @@
 # 前后端分离架构 - 前端服务
 
 # 多阶段构建：构建阶段
-FROM node:18-alpine AS builder
+FROM docker.m.daocloud.io/library/node:18-alpine AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ COPY docs/ ./docs/
 RUN cd frontend && npm run build
 
 # 多阶段构建：运行阶段
-FROM nginx:alpine AS runtime
+FROM docker.m.daocloud.io/library/nginx:alpine AS runtime
 
 WORKDIR /usr/share/nginx/html
 

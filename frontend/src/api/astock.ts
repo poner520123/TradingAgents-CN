@@ -78,6 +78,9 @@ export interface CrossAnalysisItem {
   success_count: number
   success_rate: number
   source_url: string
+  popularity_rank?: number
+  capital_flow_rank?: number
+  limit_up?: boolean
   crawled_at?: string
 }
 

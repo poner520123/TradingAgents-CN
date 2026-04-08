@@ -23,23 +23,54 @@ class ExpertRankingSpider(scrapy.Spider):
     
     def start_requests(self):
         """重写start_requests方法，设置初始请求"""
+        # 随机User-Agent列表
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+        
         for url in self.start_urls:
             self.logger.info(f"开始爬取: {url}")
+            
+            # 随机选择User-Agent
+            user_agent = random.choice(user_agents)
+            
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.178448.com/'
+                'User-Agent': user_agent,
+                'Referer': 'https://www.178448.com/',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            }
+            
+            # 添加Cookie
+            cookies = {
+                'Hm_lvt_66b3990901952af5a1033e189085235e': str(int(time.time())),
+                'Hm_lpvt_66b3990901952af5a1033e189085235e': str(int(time.time())),
+                'sessionid': f'session_{random.randint(100000, 999999)}'
             }
             
             yield scrapy.Request(
                 url=url,
                 headers=headers,
+                cookies=cookies,
                 callback=self.parse,
                 errback=self.handle_error,
                 dont_filter=False,
-                meta={'retry_times': 0}
+                meta={'retry_times': 0, 'dont_redirect': False}
             )
-            # 初始请求之间添加延迟
-            time.sleep(random.uniform(2, 4))
+            # 初始请求之间添加更长的延迟
+            time.sleep(random.uniform(5, 8))
     
     def handle_error(self, failure):
         """处理请求错误"""
@@ -178,8 +209,8 @@ class ExpertRankingSpider(scrapy.Spider):
                         self.logger.warning(f"数据验证失败，跳过: {fjgp}")
                         continue
 
-                    # 筛选条件检查（最近3周，分析数>2，成功率>30%）
-                    if fjsj >= self.time_pre_week_1 and float(cg) > 2 and float(cgl) > 30:
+                    # 筛选条件检查（最近3周，分析数>2，成功率>60%）
+                    if fjsj >= self.time_pre_week_1 and float(cg) > 2 and float(cgl) > 60:
                         # 提取股票代码
                         stock_code = self.extract_stock_code(fjgp)
                         

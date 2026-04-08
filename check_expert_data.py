@@ -1,31 +1,46 @@
-from app.services.scrapy_crawler_service import ScrapyCrawlerService
+from pymongo import MongoClient
+from app.core.config import settings
+from datetime import datetime, timedelta
 
-# 获取Scrapy爬虫服务实例
-service = ScrapyCrawlerService()
+# 连接MongoDB
+client = MongoClient(settings.MONGO_URI)
+db = client[settings.MONGO_DB]
+collection = db.expert_ranking_data
 
-# 获取所有专家排行数据
-cursor = service.expert_ranking_collection.find()
+# 检查4月3日的数据
+date = datetime(2026, 4, 3)
+start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
+end_of_day = start_of_day + timedelta(days=1)
+
+print("=== 检查4月3日专家排行数据 ===")
+
+# 获取当天所有数据
+cursor = collection.find({'crawled_at': {'$gte': start_of_day, '$lt': end_of_day}})
 all_data = list(cursor)
 
-print(f"数据库中专家排行总数据条数: {len(all_data)}")
+print(f"4月3日总数据量: {len(all_data)}")
 
-# 统计股票代码重复情况
-from collections import defaultdict
-code_counts = defaultdict(int)
+# 按小时统计数据量
+hourly_counts = {}
 for item in all_data:
-    code = item.get('code', '')
-    code_counts[code] += 1
+    crawled_at = item.get('crawled_at')
+    if crawled_at:
+        hour = crawled_at.hour
+        hourly_counts[hour] = hourly_counts.get(hour, 0) + 1
 
-print('\n股票代码重复情况:')
-for code, count in code_counts.items():
-    if count > 1:
-        print(f'{code}: {count}次')
+print("\n按小时统计数据量:")
+for hour in sorted(hourly_counts.keys()):
+    print(f"  {hour}:00 - {hour+1}:00: {hourly_counts[hour]} 条")
 
-# 查看具体的重复记录
-print('\n重复记录详情:')
-for code, count in code_counts.items():
-    if count > 1:
-        print(f'\n股票代码 {code} 的记录:')
-        records = [item for item in all_data if item.get('code') == code]
-        for i, record in enumerate(records):
-            print(f"  记录{i+1}: expert_name={record.get('expert_name')}, name={record.get('name')}, analysis_time={record.get('analysis_time')}")
+# 检查8:30-12:00之间的数据
+start_time = date.replace(hour=8, minute=30)
+end_time = date.replace(hour=12, minute=0)
+cursor = collection.find({'crawled_at': {'$gte': start_time, '$lte': end_time}})
+target_data = list(cursor)
+
+print(f"\n8:30-12:00之间的数据量: {len(target_data)}")
+
+if target_data:
+    print("\n数据示例:")
+    for item in target_data[:5]:
+        print(f"  时间: {item['crawled_at']}, 专家: {item['expert_name']}, 股票: {item['name']}")

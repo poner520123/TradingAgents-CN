@@ -14,13 +14,24 @@ class StockMapService:
     """股票名称到代码的映射服务"""
     
     def __init__(self):
-        # 初始化MongoDB连接
-        self.client = MongoClient(settings.MONGO_URI)
-        self.db = self.client[settings.MONGO_DB]
-        self.collection = self.db["stock_name_code_mapping"]
-        # 创建唯一索引（仅对name字段，code字段可能存在重复）
-        self.collection.create_index([("name", 1)], unique=True)
-        self.collection.create_index([("code", 1)])  # 非唯一索引，用于加速查询
+        self.mongodb_available = False
+        self.client = None
+        self.db = None
+        self.collection = None
+        
+        # 尝试初始化MongoDB连接
+        try:
+            self.client = MongoClient(settings.MONGO_URI)
+            self.db = self.client[settings.MONGO_DB]
+            self.collection = self.db["stock_name_code_mapping"]
+            # 创建唯一索引（仅对name字段，code字段可能存在重复）
+            self.collection.create_index([("name", 1)], unique=True)
+            self.collection.create_index([("code", 1)])  # 非唯一索引，用于加速查询
+            self.mongodb_available = True
+            logger.info("✅ MongoDB连接成功，股票映射服务初始化完成")
+        except Exception as e:
+            logger.warning(f"⚠️ MongoDB连接失败: {e}，将使用内存缓存模式")
+            self.mongodb_available = False
         
         # 初始化内存缓存
         self.name_to_code: Dict[str, str] = {}  # 名称到代码的映射
@@ -37,20 +48,28 @@ class StockMapService:
         self.name_to_code.clear()
         self.code_to_name.clear()
         
-        # 从数据库获取所有映射
-        maps = self.collection.find()
         count = 0
         
-        for map_item in maps:
-            name = map_item.get("name")
-            code = map_item.get("code")
-            
-            if name and code:
-                self.name_to_code[name] = code
-                self.code_to_name[code] = name
-                count += 1
-        
-        logger.info(f"内存缓存重建完成，共加载 {count} 条映射")
+        # 只有在MongoDB可用时才从数据库加载
+        if self.mongodb_available and self.collection is not None:
+            try:
+                # 从数据库获取所有映射
+                maps = self.collection.find()
+                
+                for map_item in maps:
+                    name = map_item.get("name")
+                    code = map_item.get("code")
+                    
+                    if name and code:
+                        self.name_to_code[name] = code
+                        self.code_to_name[code] = name
+                        count += 1
+                
+                logger.info(f"内存缓存重建完成，共加载 {count} 条映射")
+            except Exception as e:
+                logger.warning(f"⚠️ 从数据库加载映射失败: {e}")
+        else:
+            logger.info("MongoDB不可用，使用空缓存")
         
     def load_from_csv(self, csv_path: str) -> int:
         """从CSV文件加载股票名称到代码的映射"""
@@ -105,23 +124,33 @@ class StockMapService:
             logger.info(f"从缓存获取股票代码: {name} -> {self.name_to_code[name]}")
             return self.name_to_code[name]
         
-        # 如果缓存中没有，从数据库查询
-        map_data = self.collection.find_one({"name": name})
-        if map_data:
-            code = map_data["code"]
-            # 更新缓存
-            self.name_to_code[name] = code
-            self.code_to_name[code] = name
-            return code
+        # 如果缓存中没有，且MongoDB可用，从数据库查询
+        if self.mongodb_available and self.collection is not None:
+            try:
+                map_data = self.collection.find_one({"name": name})
+                if map_data:
+                    code = map_data["code"]
+                    # 更新缓存
+                    self.name_to_code[name] = code
+                    self.code_to_name[code] = name
+                    return code
+            except Exception as e:
+                logger.warning(f"⚠️ 从数据库查询失败: {e}")
         
-        # 如果数据库中没有，通过API查询
-        logger.info(f"数据库中未找到股票代码，通过API查询: {name}")
+        # 如果数据库中没有或MongoDB不可用，通过API查询
+        logger.info(f"数据库中未找到股票代码或MongoDB不可用，通过API查询: {name}")
         code = self._get_stock_code_from_api(name)
         if code:
-            # 将查询结果保存到数据库
-            market = self._get_market_by_code(code)
-            self.upsert_map(name, code, market)
-            logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到数据库")
+            # 将查询结果保存到数据库（如果MongoDB可用）
+            if self.mongodb_available:
+                market = self._get_market_by_code(code)
+                self.upsert_map(name, code, market)
+                logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到数据库")
+            else:
+                # 只更新内存缓存
+                self.name_to_code[name] = code
+                self.code_to_name[code] = name
+                logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到内存缓存")
             return code
         
         return None
@@ -148,18 +177,25 @@ class StockMapService:
         if not missing_names:
             return result
         
-        # 2. 批量查询数据库
-        maps = self.collection.find({"name": {"$in": missing_names}})
+        # 2. 批量查询数据库（如果MongoDB可用）
         db_found = []
-        for map_data in maps:
-            result[map_data["name"]] = map_data["code"]
-            # 更新内存缓存
-            self.name_to_code[map_data["name"]] = map_data["code"]
-            self.code_to_name[map_data["code"]] = map_data["name"]
-            db_found.append(map_data["name"])
-        
-        if db_found:
-            logger.info(f"从数据库获取到 {len(db_found)} 个股票代码")
+        if self.mongodb_available and self.collection is not None:
+            try:
+                maps = self.collection.find({"name": {"$in": missing_names}})
+                for map_data in maps:
+                    result[map_data["name"]] = map_data["code"]
+                    # 更新内存缓存
+                    self.name_to_code[map_data["name"]] = map_data["code"]
+                    self.code_to_name[map_data["code"]] = map_data["name"]
+                    db_found.append(map_data["name"])
+                
+                if db_found:
+                    logger.info(f"从数据库获取到 {len(db_found)} 个股票代码")
+            except Exception as e:
+                logger.warning(f"⚠️ 批量查询数据库失败: {e}")
+                db_found = []
+        else:
+            logger.info("MongoDB不可用，跳过数据库查询")
         
         # 3. 找出数据库中也没有的股票名称
         api_names = [name for name in missing_names if name not in db_found]
@@ -200,23 +236,29 @@ class StockMapService:
             if not market:
                 market = self._get_market_by_code(code)
             
-            # 更新或插入
-            self.collection.update_one(
-                {"name": name},
-                {
-                    "$set": {
-                        "code": code,
-                        "market": market,
-                        "updated_at": datetime.utcnow()
-                    },
-                    "$setOnInsert": {
-                        "created_at": datetime.utcnow()
-                    }
-                },
-                upsert=True
-            )
+            # 如果MongoDB可用，写入数据库
+            if self.mongodb_available and self.collection is not None:
+                try:
+                    # 更新或插入
+                    self.collection.update_one(
+                        {"name": name},
+                        {
+                            "$set": {
+                                "code": code,
+                                "market": market,
+                                "updated_at": datetime.utcnow()
+                            },
+                            "$setOnInsert": {
+                                "created_at": datetime.utcnow()
+                            }
+                        },
+                        upsert=True
+                    )
+                    logger.info(f"映射已保存到数据库: {name} -> {code}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 写入数据库失败: {e}")
             
-            # 更新缓存
+            # 无论数据库操作是否成功，都更新内存缓存
             self.name_to_code[name] = code
             self.code_to_name[code] = name
             logger.info(f"更新缓存: {name} -> {code}")
@@ -229,13 +271,33 @@ class StockMapService:
         """获取所有股票名称到代码的映射"""
         logger.info(f"获取所有股票名称到代码的映射，跳过 {skip}，限制 {limit}")
         
-        maps = self.collection.find().skip(skip).limit(limit)
         result = []
-        for map_item in maps:
-            # 转换ObjectId为字符串，确保可序列化
-            if "_id" in map_item:
-                map_item["_id"] = str(map_item["_id"])
-            result.append(map_item)
+        
+        # 如果MongoDB可用，从数据库获取
+        if self.mongodb_available and self.collection is not None:
+            try:
+                maps = self.collection.find().skip(skip).limit(limit)
+                for map_item in maps:
+                    # 转换ObjectId为字符串，确保可序列化
+                    if "_id" in map_item:
+                        map_item["_id"] = str(map_item["_id"])
+                    result.append(map_item)
+            except Exception as e:
+                logger.warning(f"⚠️ 从数据库获取映射失败: {e}")
+                result = []
+        else:
+            # 如果MongoDB不可用，从内存缓存获取
+            logger.info("MongoDB不可用，从内存缓存获取映射")
+            count = 0
+            for name, code in self.name_to_code.items():
+                if count >= skip and len(result) < limit:
+                    result.append({
+                        "name": name,
+                        "code": code,
+                        "market": self._get_market_by_code(code)
+                    })
+                count += 1
+        
         return result
     
     def get_name_by_code(self, code: str) -> Optional[str]:
@@ -246,20 +308,32 @@ class StockMapService:
             logger.info(f"从缓存获取股票名称: {code} -> {self.code_to_name[code]}")
             return self.code_to_name[code]
         
-        # 如果缓存中没有，从数据库查询
-        map_data = self.collection.find_one({"code": code})
-        if map_data:
-            name = map_data["name"]
-            # 更新缓存
-            self.code_to_name[code] = name
-            self.name_to_code[name] = code
-            return name
+        # 如果缓存中没有，且MongoDB可用，从数据库查询
+        if self.mongodb_available and self.collection is not None:
+            try:
+                map_data = self.collection.find_one({"code": code})
+                if map_data:
+                    name = map_data["name"]
+                    # 更新缓存
+                    self.code_to_name[code] = name
+                    self.name_to_code[name] = code
+                    return name
+            except Exception as e:
+                logger.warning(f"⚠️ 从数据库查询失败: {e}")
         
         return None
     
     def get_total_count(self) -> int:
         """获取股票名称到代码的映射总数"""
-        return self.collection.count_documents({})
+        # 如果MongoDB可用，从数据库获取
+        if self.mongodb_available and self.collection is not None:
+            try:
+                return self.collection.count_documents({})
+            except Exception as e:
+                logger.warning(f"⚠️ 从数据库获取计数失败: {e}")
+        
+        # 如果MongoDB不可用，返回内存缓存中的数量
+        return len(self.name_to_code)
     
     def get_a_stock_names(self) -> List[str]:
         """获取A股上市公司名称列表"""
@@ -401,8 +475,18 @@ class StockMapService:
         
         # 遍历A股上市公司名称
         for name in a_stock_names:
-            # 检查是否已存在映射
-            existing = self.collection.find_one({"name": name})
+            # 检查是否已存在映射（先检查内存缓存，再检查数据库）
+            if name in self.name_to_code:
+                continue
+            
+            # 如果MongoDB可用，检查数据库
+            existing = None
+            if self.mongodb_available and self.collection is not None:
+                try:
+                    existing = self.collection.find_one({"name": name})
+                except Exception as e:
+                    logger.warning(f"⚠️ 检查数据库失败: {e}")
+            
             if not existing:
                 missing += 1
                 
@@ -412,15 +496,24 @@ class StockMapService:
                     # 确定市场类型
                     market = self._get_market_by_code(code)
                     
-                    # 插入数据
-                    map_data = {
-                        "name": name,
-                        "code": code,
-                        "market": market,
-                        "updated_at": datetime.utcnow(),
-                        "created_at": datetime.utcnow()
-                    }
-                    self.collection.insert_one(map_data)
+                    # 如果MongoDB可用，插入数据库
+                    if self.mongodb_available and self.collection is not None:
+                        try:
+                            map_data = {
+                                "name": name,
+                                "code": code,
+                                "market": market,
+                                "updated_at": datetime.utcnow(),
+                                "created_at": datetime.utcnow()
+                            }
+                            self.collection.insert_one(map_data)
+                            logger.info(f"补充映射到数据库: {name} -> {code}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ 插入数据库失败: {e}")
+                    
+                    # 更新内存缓存
+                    self.name_to_code[name] = code
+                    self.code_to_name[code] = name
                     supplemented += 1
                     logger.info(f"补充映射: {name} -> {code}")
         
@@ -434,9 +527,21 @@ class StockMapService:
     def clear_mappings(self) -> bool:
         """清空所有股票名称和代码映射"""
         logger.info("开始清空所有股票名称和代码映射")
+        
         try:
-            result = self.collection.delete_many({})
-            logger.info(f"成功清空所有股票名称和代码映射，共删除 {result.deleted_count} 条记录")
+            # 如果MongoDB可用，清空数据库
+            if self.mongodb_available and self.collection is not None:
+                try:
+                    result = self.collection.delete_many({})
+                    logger.info(f"成功清空数据库中的股票名称和代码映射，共删除 {result.deleted_count} 条记录")
+                except Exception as e:
+                    logger.warning(f"⚠️ 清空数据库失败: {e}")
+            
+            # 清空内存缓存
+            self.name_to_code.clear()
+            self.code_to_name.clear()
+            logger.info("成功清空内存缓存中的股票名称和代码映射")
+            
             return True
         except Exception as e:
             logger.error(f"清空股票名称和代码映射失败: {e}")

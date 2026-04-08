@@ -24,7 +24,12 @@
         </el-table-column>
         <el-table-column prop="name" label="股票名称" width="90" fixed>
           <template #default="scope">
-            <span class="font-bold">{{ scope.row.name }}</span>
+            <div class="flex items-center">
+              <span class="font-bold">{{ scope.row.name }}</span>
+              <el-icon v-if="scope.row.limit_up" class="ml-1 text-red-500" title="涨停">
+                <Warning />
+              </el-icon>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="success_rate" label="成功率" width="90" sortable>
@@ -95,7 +100,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { DataAnalysis, Plus } from '@element-plus/icons-vue'
+import { DataAnalysis, Plus, Warning } from '@element-plus/icons-vue'
 import { getCrossAnalysisData, type CrossAnalysisItem } from '@/api/astock'
 import { favoritesApi } from '@/api/favorites'
 

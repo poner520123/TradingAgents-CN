@@ -3,7 +3,7 @@
 # 支持多架构: amd64, arm64
 
 # 多阶段构建：构建阶段
-FROM python:3.10-slim-bookworm AS builder
+FROM docker.m.daocloud.io/library/python:3.10-slim-bookworm AS builder
 
 # 获取构建架构信息
 ARG TARGETARCH
@@ -47,7 +47,7 @@ RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install --prefer-binary pdfkit scrapy -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 多阶段构建：运行阶段
-FROM python:3.10-slim-bookworm
+FROM docker.m.daocloud.io/library/python:3.10-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

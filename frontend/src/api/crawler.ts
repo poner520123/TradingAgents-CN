@@ -26,13 +26,24 @@ export interface CrawlerListResponse {
   message: string
 }
 
-export function getCrawlerData(page: number = 1, pageSize: number = 20) {
+export interface CrawlerFilterParams {
+  page?: number
+  page_size?: number
+  user_name?: string
+  min_success_rate?: number | null
+  reason?: string
+  start_date?: string
+  end_date?: string
+}
+
+export function getCrawlerData(params: CrawlerFilterParams = {}) {
   return request<CrawlerListResponse>({
     url: '/api/crawler/list',
     method: 'get',
     params: {
-      page,
-      page_size: pageSize
+      page: 1,
+      page_size: 20,
+      ...params
     }
   })
 }
