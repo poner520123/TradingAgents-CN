@@ -94,15 +94,14 @@ services:
       - "3000:80"
     environment:
       TZ: "Asia/Shanghai"
-      # 后端API地址
-      VITE_API_BASE_URL: "http://localhost:8000"
+      # 后端API地址 - 空字符串表示使用相对路径，通过nginx代理
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - tradingagents-network
     healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost" ]
+      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -125,7 +124,7 @@ services:
 
   # MongoDB 数据库服务
   mongodb:
-    image: mongo:4.4
+    image: docker.m.daocloud.io/library/mongo:4.4
     container_name: ta-mongodb
     restart: unless-stopped
     ports:
@@ -133,7 +132,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin123
-      MONGO_INITDB_DATABASE: ta
+      MONGO_INITDB_DATABASE: tradingagents
       TZ: "Asia/Shanghai"
     volumes:
       - mongodb_data:/data/db
@@ -163,7 +162,7 @@ services:
 
   # Redis 缓存服务
   redis:
-    image: redis:7-alpine
+    image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: ta-redis
     restart: unless-stopped
     ports:

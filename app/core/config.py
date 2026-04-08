@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     MONGODB_PORT: int = Field(default=27017)
     MONGODB_USERNAME: str = Field(default="")
     MONGODB_PASSWORD: str = Field(default="")
-    MONGODB_DATABASE: str = Field(default="ta")
+    MONGODB_DATABASE: str = Field(default="tradingagents")
     MONGODB_AUTH_SOURCE: str = Field(default="admin")
     MONGO_MAX_CONNECTIONS: int = Field(default=100)
     MONGO_MIN_CONNECTIONS: int = Field(default=10)

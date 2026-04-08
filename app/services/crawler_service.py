@@ -471,24 +471,231 @@ class CrawlerService:
         logger.info(f"历史爬虫数据股票代码更新完成，共处理 {total} 条，成功更新 {updated} 条")
         return {"total": total, "updated": updated}
 
-    def get_data(self, page=1, page_size=20):
-        """Retrieve data for API."""
+    def get_data(self, page=1, page_size=20, user_name=None, stock_name=None, min_success_rate=None, reason=None, start_date=None, end_date=None):
+        """Retrieve data for API with filtering."""
+        # Build query filter
+        query = {}
+        
+        # Filter by user_name
+        if user_name:
+            query['user_name'] = {'$regex': user_name, '$options': 'i'}
+        
+        # Filter by stock_name
+        if stock_name:
+            query['stock_name'] = {'$regex': stock_name, '$options': 'i'}
+        
+        # Filter by reason
+        if reason:
+            query['reason'] = {'$regex': reason, '$options': 'i'}
+        
+        # Filter by date range
+        if start_date or end_date:
+            # 使用正则表达式匹配日期部分
+            # 数据库中的time格式为"YYYY-MM-DD  HH:MM"（注意两个空格）
+            if min_success_rate is not None:
+                # 如果使用聚合管道，需要在聚合中处理日期筛选
+                pass
+            else:
+                # 使用正则表达式匹配日期部分
+                if start_date and end_date:
+                    # 日期范围查询 - 使用正则表达式匹配日期部分
+                    query['$and'] = [
+                        {'time': {'$regex': f'^{start_date}'}},
+                        {'time': {'$regex': f'^{end_date}'}}
+                    ]
+                elif start_date:
+                    # 只查询开始日期的数据
+                    query['time'] = {'$regex': f'^{start_date}'}
+                elif end_date:
+                    # 只查询结束日期的数据
+                    query['time'] = {'$regex': f'^{end_date}'}
+        
+        # Calculate pagination
         skip = (page - 1) * page_size
-        total = self.collection.count_documents({})
-        cursor = self.collection.find().sort("time", DESCENDING).skip(skip).limit(page_size)
-        data = list(cursor)
-        # Convert ObjectId to string and process data types
-        for d in data:
-            if '_id' in d:
-                d['_id'] = str(d['_id'])
+        
+        # Check if we need to use aggregation for success_rate filtering
+        if min_success_rate is not None:
+            # Use aggregation to convert string to number for comparison
+            # Since success_rate is stored as string (e.g., "85%"), we need to extract numeric value
+            pipeline = []
             
-            # Ensure success_count is an integer
-            if 'success_count' in d:
-                try:
-                    d['success_count'] = int(d['success_count'])
-                except (ValueError, TypeError):
-                    d['success_count'] = 0
-        return data, total
+            # Add match stage for other filters first
+            if query:
+                pipeline.append({'$match': query})
+            
+            # Add date range filter if needed
+            if start_date or end_date:
+                date_conditions = []
+                
+                if start_date:
+                    date_conditions.append({
+                        '$expr': {
+                            '$gte': [
+                                {'$substr': ['$time', 0, 10]},
+                                start_date
+                            ]
+                        }
+                    })
+                
+                if end_date:
+                    date_conditions.append({
+                        '$expr': {
+                            '$lte': [
+                                {'$substr': ['$time', 0, 10]},
+                                end_date
+                            ]
+                        }
+                    })
+                
+                if date_conditions:
+                    pipeline.append({'$match': {'$and': date_conditions}})
+            
+            # Add match stage for success_rate using aggregation
+            pipeline.extend([
+                {
+                    '$project': {
+                        'stock_code': 1,
+                        'stock_name': 1,
+                        'user_name': 1,
+                        'success_rate': 1,
+                        'concepts': 1,
+                        'reason': 1,
+                        'time': 1,
+                        'price': 1,
+                        'success_count': 1,
+                        # Extract numeric value from success_rate string
+                        'success_rate_num': {
+                            '$toDouble': {'$replaceOne': {'input': '$success_rate', 'find': '%', 'replacement': ''}}
+                        }
+                    }
+                },
+                {
+                    '$match': {
+                        'success_rate_num': {'$gte': min_success_rate}
+                    }
+                },
+                {
+                    '$sort': {'time': DESCENDING}
+                },
+                {
+                    '$skip': skip
+                },
+                {
+                    '$limit': page_size
+                }
+            ])
+            
+            # Execute aggregation pipeline
+            cursor = self.collection.aggregate(pipeline)
+            data = list(cursor)
+            
+            # Get total count with filters including success_rate
+            count_pipeline = []
+            if query:
+                count_pipeline.append({'$match': query})
+            
+            # Add date range filter to count pipeline if needed
+            if start_date or end_date:
+                date_conditions = []
+                
+                if start_date:
+                    date_conditions.append({
+                        '$expr': {
+                            '$gte': [
+                                {'$substr': ['$time', 0, 10]},
+                                start_date
+                            ]
+                        }
+                    })
+                
+                if end_date:
+                    date_conditions.append({
+                        '$expr': {
+                            '$lte': [
+                                {'$substr': ['$time', 0, 10]},
+                                end_date
+                            ]
+                        }
+                    })
+                
+                if date_conditions:
+                    count_pipeline.append({'$match': {'$and': date_conditions}})
+            
+            count_pipeline.extend([
+                {
+                    '$project': {
+                        'success_rate_num': {
+                            '$toDouble': {'$replaceOne': {'input': '$success_rate', 'find': '%', 'replacement': ''}}
+                        }
+                    }
+                },
+                {
+                    '$match': {
+                        'success_rate_num': {'$gte': min_success_rate}
+                    }
+                },
+                {
+                    '$count': 'total'
+                }
+            ])
+            
+            count_result = list(self.collection.aggregate(count_pipeline))
+            total = count_result[0]['total'] if count_result else 0
+            
+            # Convert ObjectId to string and process data types
+            for d in data:
+                if '_id' in d:
+                    d['_id'] = str(d['_id'])
+                
+                # Ensure success_count is an integer
+                if 'success_count' in d:
+                    try:
+                        d['success_count'] = int(d['success_count'])
+                    except (ValueError, TypeError):
+                        d['success_count'] = 0
+                
+                # Keep success_rate as string to match model definition
+                if 'success_rate' in d:
+                    try:
+                        # Ensure it's a string
+                        d['success_rate'] = str(d['success_rate'])
+                    except (ValueError, TypeError):
+                        d['success_rate'] = "0.0%"
+                
+                # Remove the temporary field
+                d.pop('success_rate_num', None)
+            
+            return data, total
+        else:
+            # Use regular find for faster performance when no success_rate filter
+            # Get total count with filters
+            total = self.collection.count_documents(query)
+            
+            # Fetch data with filters and pagination
+            cursor = self.collection.find(query).sort("time", DESCENDING).skip(skip).limit(page_size)
+            data = list(cursor)
+            
+            # Convert ObjectId to string and process data types
+            for d in data:
+                if '_id' in d:
+                    d['_id'] = str(d['_id'])
+                
+                # Ensure success_count is an integer
+                if 'success_count' in d:
+                    try:
+                        d['success_count'] = int(d['success_count'])
+                    except (ValueError, TypeError):
+                        d['success_count'] = 0
+                
+                # Keep success_rate as string to match model definition
+                if 'success_rate' in d:
+                    try:
+                        # Ensure it's a string
+                        d['success_rate'] = str(d['success_rate'])
+                    except (ValueError, TypeError):
+                        d['success_rate'] = "0.0%"
+            
+            return data, total
 
     def crawl_pages(self, start_page, end_page, force=False):
         """Crawl pages with enhanced thread stability."""

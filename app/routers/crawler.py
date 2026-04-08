@@ -17,14 +17,20 @@ def get_crawler_service():
 async def get_crawler_data(
     page: int = 1, 
     page_size: int = 20,
+    user_name: Optional[str] = None,
+    stock_name: Optional[str] = None,
+    min_success_rate: Optional[float] = None,
+    reason: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     service: CrawlerService = Depends(get_crawler_service)
 ):
     """
-    Get paginated crawler data.
+    Get paginated crawler data with filtering.
     """
     try:
-        print(f"🐛 get_crawler_data called - page: {page}, page_size: {page_size}")
-        data, total = service.get_data(page, page_size)
+        print(f"🐛 get_crawler_data called - page: {page}, page_size: {page_size}, user_name: {user_name}, stock_name: {stock_name}, min_success_rate: {min_success_rate}, reason: {reason}, start_date: {start_date}, end_date: {end_date}")
+        data, total = service.get_data(page, page_size, user_name, stock_name, min_success_rate, reason, start_date, end_date)
         return CrawlerDataListResponse(
             success=True,
             data=data,

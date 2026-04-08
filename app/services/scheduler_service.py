@@ -1043,6 +1043,17 @@ def set_scheduler_instance(scheduler: AsyncIOScheduler):
     logger.info("✅ 调度器实例已设置")
 
 
+def get_scheduler_instance() -> Optional[AsyncIOScheduler]:
+    """
+    获取调度器实例
+
+    Returns:
+        调度器实例
+    """
+    global _scheduler_instance
+    return _scheduler_instance
+
+
 def get_scheduler_service() -> SchedulerService:
     """
     获取调度器服务实例

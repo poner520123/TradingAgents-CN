@@ -5,6 +5,7 @@
 
 import logging
 import asyncio
+import os
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import MongoClient
@@ -191,21 +192,47 @@ async def init_database():
     global mongo_client, mongo_db, redis_client, redis_pool
 
     try:
-        # 初始化MongoDB
-        await db_manager.init_mongodb()
-        mongo_client = db_manager.mongo_client
-        mongo_db = db_manager.mongo_db
+        # 检查环境变量中的数据库启用状态
+        mongodb_enabled = os.getenv('MONGODB_ENABLED', 'true').lower() == 'true'
+        redis_enabled = os.getenv('REDIS_ENABLED', 'true').lower() == 'true'
+        
+        # 初始化MongoDB（如果启用）
+        if mongodb_enabled:
+            try:
+                await db_manager.init_mongodb()
+                mongo_client = db_manager.mongo_client
+                mongo_db = db_manager.mongo_db
+                logger.info("✅ MongoDB初始化完成")
+                
+                # 🔥 初始化数据库视图和索引 - 移到后台任务执行
+                import asyncio
+                asyncio.create_task(init_database_views_and_indexes())
+            except Exception as e:
+                logger.warning(f"⚠️ MongoDB初始化失败: {e}，将继续启动应用")
+                mongo_client = None
+                mongo_db = None
+        else:
+            logger.info("MongoDB已禁用，跳过初始化")
+            mongo_client = None
+            mongo_db = None
 
-        # 初始化Redis
-        await db_manager.init_redis()
-        redis_client = db_manager.redis_client
-        redis_pool = db_manager.redis_pool
+        # 初始化Redis（如果启用）
+        if redis_enabled:
+            try:
+                await db_manager.init_redis()
+                redis_client = db_manager.redis_client
+                redis_pool = db_manager.redis_pool
+                logger.info("✅ Redis初始化完成")
+            except Exception as e:
+                logger.warning(f"⚠️ Redis初始化失败: {e}，将继续启动应用")
+                redis_client = None
+                redis_pool = None
+        else:
+            logger.info("Redis已禁用，跳过初始化")
+            redis_client = None
+            redis_pool = None
 
-        logger.info("🎉 所有数据库连接初始化完成")
-
-        # 🔥 初始化数据库视图和索引 - 移到后台任务执行
-        import asyncio
-        asyncio.create_task(init_database_views_and_indexes())
+        logger.info("🎉 数据库初始化完成")
 
     except Exception as e:
         logger.error(f"💥 数据库初始化失败: {e}")

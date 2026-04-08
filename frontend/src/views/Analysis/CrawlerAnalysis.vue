@@ -21,6 +21,45 @@
         </div>
       </template>
 
+      <!-- 筛选条件表单 -->
+      <div class="filter-form" style="margin-bottom: 20px;">
+        <el-form :inline="true" :model="filterForm" class="filter-form">
+          <el-form-item label="伏击人">
+            <el-input v-model="filterForm.user_name" placeholder="请输入伏击人" clearable />
+          </el-form-item>
+          <el-form-item label="成功率">
+            <el-input-number 
+              v-model="filterForm.min_success_rate" 
+              :min="0" 
+              :max="100" 
+              :step="5"
+              placeholder="最低成功率"
+              style="width: 120px;"
+            />
+          </el-form-item>
+          <el-form-item label="伏击理由">
+            <el-input v-model="filterForm.reason" placeholder="请输入伏击理由" clearable />
+          </el-form-item>
+          <el-form-item label="日期范围">
+            <el-date-picker
+              v-model="filterForm.date_range"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              default-time="00:00:00"
+              style="width: 240px;"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleFilter">筛选</el-button>
+            <el-button @click="resetFilter">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+
       <!-- 爬虫数据列表 -->
       <el-table :data="tableData" style="width: 100%" v-loading="loading" border stripe>
         <el-table-column prop="stock_code" label="股票代码" width="120" fixed>
@@ -134,6 +173,14 @@ const pageSize = ref(20)
 const total = ref(0)
 const crawlPages = ref(5)
 
+// 筛选表单数据
+const filterForm = ref({
+  user_name: '',
+  min_success_rate: null,
+  reason: '',
+  date_range: null as [Date, Date] | null
+})
+
 // 爬虫状态管理
 interface CrawlerStatus {
   visible: boolean
@@ -172,7 +219,22 @@ onMounted(async () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await getCrawlerData(currentPage.value, pageSize.value)
+    // 构建筛选参数
+    const params = {
+      page: currentPage.value,
+      page_size: pageSize.value,
+      user_name: filterForm.value.user_name,
+      min_success_rate: filterForm.value.min_success_rate,
+      reason: filterForm.value.reason
+    }
+
+    // 添加日期范围筛选
+    if (filterForm.value.date_range) {
+      params.start_date = filterForm.value.date_range[0].toISOString().split('T')[0]
+      params.end_date = filterForm.value.date_range[1].toISOString().split('T')[0]
+    }
+
+    const res = await getCrawlerData(params)
     if (res.success) {
       tableData.value = res.data
       total.value = res.total
@@ -358,6 +420,25 @@ const addLog = (msg: string) => {
   if (crawlerLogs.value.length > 5) {
     crawlerLogs.value.pop()
   }
+}
+
+const handleFilter = () => {
+  // 重置页码到第一页
+  currentPage.value = 1
+  fetchData()
+}
+
+const resetFilter = () => {
+  // 重置筛选表单
+  filterForm.value = {
+    user_name: '',
+    min_success_rate: null,
+    reason: '',
+    date_range: null
+  }
+  // 重置页码到第一页
+  currentPage.value = 1
+  fetchData()
 }
 
 const closeCrawlerStatus = () => {

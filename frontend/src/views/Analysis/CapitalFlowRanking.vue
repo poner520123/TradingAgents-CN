@@ -12,6 +12,11 @@
 
       <!-- 资金流向排行榜数据列表 -->
       <el-table :data="tableData" style="width: 100%" v-loading="loading" border stripe>
+        <el-table-column label="排名" width="80" fixed>
+          <template #default="scope">
+            <span class="font-bold">{{ scope.$index + 1 }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="code" label="股票代码" width="120" fixed>
           <template #default="scope">
             <span class="font-bold">{{ scope.row.code }}</span>
@@ -31,7 +36,7 @@
         </el-table-column>
         <el-table-column prop="change_ratio" label="涨跌幅" width="100" sortable>
           <template #default="scope">
-            <el-tag :type="scope.row.change_ratio.startsWith('-') ? 'danger' : 'success'">
+            <el-tag :type="scope.row.change_ratio.startsWith('-') ? 'success' : 'danger'">
               {{ scope.row.change_ratio }}
             </el-tag>
           </template>

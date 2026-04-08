@@ -27,32 +27,6 @@
             <span class="font-bold">{{ scope.row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="price" label="价格" width="100" sortable>
-          <template #default="scope">
-            <span class="text-red-500">
-              {{ scope.row.price }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="change_ratio" label="涨跌幅" width="100" sortable>
-          <template #default="scope">
-            <el-tag :type="scope.row.change_ratio.startsWith('-') ? 'danger' : 'success'">
-              {{ scope.row.change_ratio }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="rank_change" label="排名变化" width="100">
-          <template #default="scope">
-            <span v-if="scope.row.rank_change">
-              <el-icon v-if="scope.row.rank_change < 0" class="text-red-500"><ArrowDown /></el-icon>
-              <el-icon v-else-if="scope.row.rank_change > 0" class="text-red-500"><ArrowUp /></el-icon>
-              <span class="text-red-500">
-                {{ scope.row.rank_change < 0 ? Math.abs(scope.row.rank_change) : `+${scope.row.rank_change}` }}
-              </span>
-            </span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="scope">
             <el-button size="small" type="primary" plain @click="analyzeStock(scope.row)">
