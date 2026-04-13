@@ -25,7 +25,20 @@
       <div class="filter-form" style="margin-bottom: 20px;">
         <el-form :inline="true" :model="filterForm" class="filter-form">
           <el-form-item label="伏击人">
-            <el-input v-model="filterForm.user_name" placeholder="请输入伏击人" clearable />
+            <el-select 
+              v-model="filterForm.user_name" 
+              placeholder="请选择伏击人" 
+              clearable
+              filterable
+              style="width: 200px;"
+            >
+              <el-option
+                v-for="user in topUsers"
+                :key="user.user_name"
+                :label="`${user.user_name} (${user.success_rate}, ${user.record_count}条)`"
+                :value="user.user_name"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="成功率">
             <el-input-number 
@@ -158,7 +171,7 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { DataAnalysis, Plus, Loading, Close, CircleCheckFilled } from '@element-plus/icons-vue'
-import { getCrawlerData, startCrawl, type CrawlerData } from '@/api/crawler'
+import { getCrawlerData, startCrawl, getTopUsers, type CrawlerData, type TopUser } from '@/api/crawler'
 import { favoritesApi } from '@/api/favorites'
 import { getStockCodeByName, loadStockNameCodeMap, getStockCodesByNames } from '@/utils/stockNameCodeMap'
 import { useNotificationStore } from '@/stores/notifications'
@@ -210,11 +223,30 @@ interface LogItem {
 const crawlerLogs = ref<LogItem[]>([])
 const logContainer = ref<HTMLElement | null>(null)
 
+// 顶级用户列表
+const topUsers = ref<TopUser[]>([])
+const loadingTopUsers = ref(false)
+
 // 页面加载时初始化股票名称到代码的映射
 onMounted(async () => {
   await loadStockNameCodeMap()
+  await fetchTopUsers()
   await fetchData()
 })
+
+const fetchTopUsers = async () => {
+  loadingTopUsers.value = true
+  try {
+    const res = await getTopUsers(30)
+    if (res.success) {
+      topUsers.value = res.data
+    }
+  } catch (error) {
+    console.error('Failed to fetch top users:', error)
+  } finally {
+    loadingTopUsers.value = false
+  }
+}
 
 const fetchData = async () => {
   loading.value = true

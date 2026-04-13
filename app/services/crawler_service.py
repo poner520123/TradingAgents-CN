@@ -471,6 +471,73 @@ class CrawlerService:
         logger.info(f"历史爬虫数据股票代码更新完成，共处理 {total} 条，成功更新 {updated} 条")
         return {"total": total, "updated": updated}
 
+    def get_top_users_by_success_rate(self, limit=30):
+        """Get top users by success rate."""
+        from datetime import datetime, timedelta
+        
+        # Calculate 1 month ago
+        one_month_ago = datetime.now() - timedelta(days=30)
+        one_month_ago_str = one_month_ago.strftime('%Y-%m-%d')
+        
+        pipeline = [
+            # Filter by time (last month)
+            {
+                '$match': {
+                    '$expr': {
+                        '$gte': [
+                            {'$substr': ['$time', 0, 10]},
+                            one_month_ago_str
+                        ]
+                    }
+                }
+            },
+            # Extract numeric success rate
+            {
+                '$project': {
+                    'user_name': 1,
+                    'success_rate': 1,
+                    'success_rate_num': {
+                        '$toDouble': {'$replaceOne': {'input': '$success_rate', 'find': '%', 'replacement': ''}}
+                    }
+                }
+            },
+            # Group by user and get max success rate and count
+            {
+                '$group': {
+                    '_id': '$user_name',
+                    'max_success_rate': {'$max': '$success_rate_num'},
+                    'success_rate_str': {'$first': '$success_rate'},
+                    'record_count': {'$sum': 1}
+                }
+            },
+            # Filter users with at least 10 records
+            {'$match': {'record_count': {'$gte': 10}}},
+            # Sort by success rate descending
+            {'$sort': {'max_success_rate': DESCENDING}},
+            # Limit to top N users
+            {'$limit': limit},
+            # Project to desired format
+            {
+                '$project': {
+                    '_id': 0,
+                    'user_name': '$_id',
+                    'success_rate': '$success_rate_str',
+                    'success_rate_num': '$max_success_rate',
+                    'record_count': 1
+                }
+            }
+        ]
+        
+        cursor = self.collection.aggregate(pipeline)
+        users = list(cursor)
+        
+        # Convert success_rate_num to float for frontend
+        for user in users:
+            if 'success_rate_num' in user:
+                user['success_rate_num'] = float(user['success_rate_num'])
+        
+        return users
+
     def get_data(self, page=1, page_size=20, user_name=None, stock_name=None, min_success_rate=None, reason=None, start_date=None, end_date=None):
         """Retrieve data for API with filtering."""
         # Build query filter

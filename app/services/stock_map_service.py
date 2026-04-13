@@ -34,11 +34,14 @@ class StockMapService:
             self.mongodb_available = False
         
         # 初始化内存缓存
-        self.name_to_code: Dict[str, str] = {}  # 名称到代码的映射
-        self.code_to_name: Dict[str, str] = {}  # 代码到名称的映射
+        self.name_to_code: Dict[str, str] = {}
+        self.code_to_name: Dict[str, str] = {}
         
         # 从数据库加载所有映射到缓存
         self._rebuild_cache()
+        
+        # 检查并同步映射（如果需要）
+        self.sync_mappings_if_needed()
     
     def _rebuild_cache(self):
         """从数据库重建内存缓存"""
@@ -100,6 +103,39 @@ class StockMapService:
         self._rebuild_cache()
         logger.info(f"从CSV文件加载股票名称到代码的映射完成，共处理 {count} 条记录")
         return count
+    
+    def should_sync_mappings(self) -> bool:
+        """检查是否需要同步股票映射"""
+        # 检查数据库中是否已有映射数据
+        if self.mongodb_available and self.collection is not None:
+            try:
+                count = self.collection.count_documents({})
+                logger.info(f"数据库中已有 {count} 条股票映射记录")
+                # 如果已有记录，则不需要同步
+                return count == 0
+            except Exception as e:
+                logger.warning(f"检查数据库映射数量失败: {e}")
+                # 出错时默认需要同步
+                return True
+        else:
+            # MongoDB不可用时，检查内存缓存
+            logger.info(f"内存缓存中有 {len(self.name_to_code)} 条股票映射记录")
+            return len(self.name_to_code) == 0
+    
+    def sync_mappings_if_needed(self) -> Dict[str, int]:
+        """如果需要，同步股票映射"""
+        if not self.should_sync_mappings():
+            logger.info("股票映射已存在，跳过同步")
+            return {"status": "skipped", "message": "映射已存在"}
+        
+        logger.info("开始同步股票映射")
+        
+        # 从配置文件加载映射
+        csv_path = "config/stock_mappings.csv"
+        loaded_count = self.load_from_csv(csv_path)
+        
+        logger.info(f"股票映射同步完成，从CSV加载 {loaded_count} 条记录")
+        return {"status": "success", "loaded": loaded_count}
     
     def _get_market_by_code(self, code: str) -> str:
         """根据股票代码确定市场类型"""
@@ -447,6 +483,7 @@ class StockMapService:
             "通宇通讯": "002792",
             "舒华体育": "605299",
             "特发信息": "000070",
+            "会畅科技": "300578",
         }
         
         if name in manual_mappings:

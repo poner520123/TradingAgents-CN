@@ -58,3 +58,27 @@ export function startCrawl(pages: number = 1, force: boolean = false) {
     }
   })
 }
+
+export interface TopUser {
+  user_name: string
+  success_rate: string
+  success_rate_num: number
+  record_count: number
+}
+
+export interface TopUsersResponse {
+  success: boolean
+  data: TopUser[]
+  total: number
+  message: string
+}
+
+export function getTopUsers(limit: number = 30) {
+  return request<TopUsersResponse>({
+    url: '/api/crawler/top-users',
+    method: 'get',
+    params: {
+      limit
+    }
+  })
+}

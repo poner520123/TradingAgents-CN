@@ -74,3 +74,28 @@ async def start_crawl(
             "success": False, 
             "message": f"Failed to start crawl: {str(e)}"
         }
+
+@router.get("/top-users", tags=["crawler"])
+async def get_top_users(
+    limit: int = 30,
+    service: CrawlerService = Depends(get_crawler_service)
+):
+    """
+    Get top users by success rate.
+    """
+    try:
+        print(f"🐛 get_top_users called - limit: {limit}")
+        users = service.get_top_users_by_success_rate(limit)
+        return {
+            "success": True,
+            "data": users,
+            "total": len(users)
+        }
+    except Exception as e:
+        print(f"❌ Error in get_top_users: {e}")
+        return {
+            "success": False,
+            "message": f"Error fetching top users: {str(e)}",
+            "data": [],
+            "total": 0
+        }
