@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>前端连接测试</h1>
+    
+    <div>
+        <button class="primary" onclick="testDirectConnection()">测试直接连接后端</button>
+        <button class="primary" onclick="testProxyConnection()">测试通过代理连接</button>
+        <button class="secondary" onclick="clearResults()">清除结果</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        function addResult(message, isSuccess) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `<strong>${isSuccess ? '成功' : '失败'}:</strong> ${message}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testDirectConnection() {
+            addResult('开始测试直接连接后端...', true);
+            try {
+                const response = await fetch('http://localhost:8000/api/health', {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`直接连接成功: ${data.message}`, true);
+                } else {
+                    addResult(`直接连接失败: 状态码 ${response.status}`, false);
+                }
+            } catch (error) {
+                addResult(`直接连接错误: ${error.message}`, false);
+            }
+        }
+        
+        async function testProxyConnection() {
+            addResult('开始测试通过代理连接...', true);
+            try {
+                const response = await fetch('/api/health', {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`代理连接成功: ${data.message}`, true);
+                } else {
+                    addResult(`代理连接失败: 状态码 ${response.status}`, false);
+                }
+            } catch (error) {
+                addResult(`代理连接错误: ${error.message}`, false);
+            }
+        }
+        
+        // 页面加载时自动测试
+        window.onload = function() {
+            addResult('页面加载完成，开始自动测试...', true);
+            testDirectConnection();
+            setTimeout(testProxyConnection, 1000);
+        };
+    </script>
+</body>
+</html>

@@ -187,7 +187,7 @@ export const useAppStore = defineStore('app', {
     resetPreferences() {
       this.preferences = {
         defaultMarket: 'A股',
-        defaultDepth: '标准',
+        defaultDepth: '3',
         autoRefresh: true,
         refreshInterval: 30,
         showWelcome: true
