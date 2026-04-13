@@ -302,7 +302,7 @@ class ScrapyCrawlerService:
             }
         ]
         count_result = list(self.popularity_collection.aggregate(count_pipeline))
-        total = count_result[0]['total'] if count_result else 0
+        total = count_result[0]['total'] if count_result and len(count_result) > 0 else 0
         
         # Convert ObjectId to string
         for d in data:
@@ -354,7 +354,7 @@ class ScrapyCrawlerService:
             }
         ]
         count_result = list(self.capital_flow_collection.aggregate(count_pipeline))
-        total = count_result[0]['total'] if count_result else 0
+        total = count_result[0]['total'] if count_result and len(count_result) > 0 else 0
         
         # Convert ObjectId to string
         for d in data:
