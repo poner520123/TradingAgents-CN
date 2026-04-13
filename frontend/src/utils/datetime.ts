@@ -32,6 +32,24 @@ export function formatDateTime(
       timeStr = new Date(timestamp).toISOString()
     } else {
       timeStr = String(dateStr).trim()
+      
+      // 修复格式：支持各种时间格式
+      // 格式1: "YYYY-MM-DD  HH:MM"（两个空格，无秒数）
+      // 格式2: "YYYY-MM-DD HH:MM"（一个空格，无秒数）
+      // 格式3: "YYYY-MM-DD HH:MM:SS"（带秒数）
+      if (timeStr.match(/^\d{4}-\d{2}-\d{2}\s{1,2}\d{2}:\d{2}(:\d{2})?$/)) {
+        // 将空格替换为T
+        timeStr = timeStr.replace(/\s{1,2}/, 'T')
+        // 如果没有秒数，添加秒数
+        if (!timeStr.match(/:\d{2}:\d{2}$/)) {
+          timeStr += ':00'
+        }
+        // 添加时区信息
+        if (!timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+          timeStr += '+08:00'
+        }
+        console.debug('[时间处理] 修复时间格式:', String(dateStr), '->', timeStr)
+      }
     }
 
     // 检查时间字符串是否包含时区信息
@@ -41,7 +59,7 @@ export function formatDateTime(
 
     // 🔥 如果没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
     // 注意：如果后端已经返回了带时区的时间（如 +08:00 或 Z），这里不会修改
-    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !hasTimezone) {
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/) && !hasTimezone) {
       console.debug('[时间处理] 检测到不带时区的时间字符串，添加 +08:00:', timeStr)
       timeStr += '+08:00'
       console.debug('[时间处理] 转换后:', timeStr)
@@ -97,10 +115,27 @@ export function formatDateTimeWithRelative(dateStr: string | number | null | und
       timeStr = new Date(timestamp).toISOString()
     } else {
       timeStr = String(dateStr).trim()
+      
+      // 修复格式：支持各种时间格式
+      // 格式1: "YYYY-MM-DD  HH:MM"（两个空格，无秒数）
+      // 格式2: "YYYY-MM-DD HH:MM"（一个空格，无秒数）
+      // 格式3: "YYYY-MM-DD HH:MM:SS"（带秒数）
+      if (timeStr.match(/^\d{4}-\d{2}-\d{2}\s{1,2}\d{2}:\d{2}(:\d{2})?$/)) {
+        // 将空格替换为T
+        timeStr = timeStr.replace(/\s{1,2}/, 'T')
+        // 如果没有秒数，添加秒数
+        if (!timeStr.match(/:\d{2}:\d{2}$/)) {
+          timeStr += ':00'
+        }
+        // 添加时区信息
+        if (!timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+          timeStr += '+08:00'
+        }
+      }
     }
     
     // 🔥 如果时间字符串没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
-    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
       timeStr += '+08:00'
     }
     
@@ -197,10 +232,27 @@ export function formatRelativeTime(dateStr: string | number | null | undefined):
       timeStr = new Date(timestamp).toISOString()
     } else {
       timeStr = String(dateStr).trim()
+      
+      // 修复格式：支持各种时间格式
+      // 格式1: "YYYY-MM-DD  HH:MM"（两个空格，无秒数）
+      // 格式2: "YYYY-MM-DD HH:MM"（一个空格，无秒数）
+      // 格式3: "YYYY-MM-DD HH:MM:SS"（带秒数）
+      if (timeStr.match(/^\d{4}-\d{2}-\d{2}\s{1,2}\d{2}:\d{2}(:\d{2})?$/)) {
+        // 将空格替换为T
+        timeStr = timeStr.replace(/\s{1,2}/, 'T')
+        // 如果没有秒数，添加秒数
+        if (!timeStr.match(/:\d{2}:\d{2}$/)) {
+          timeStr += ':00'
+        }
+        // 添加时区信息
+        if (!timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+          timeStr += '+08:00'
+        }
+      }
     }
 
     // 🔥 如果时间字符串没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
-    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
       timeStr += '+08:00'
     }
 

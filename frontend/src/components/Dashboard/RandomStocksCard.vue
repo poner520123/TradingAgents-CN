@@ -52,7 +52,7 @@
           <div class="stock-reason">{{ stock.reason || '无' }}</div>
         </div>
         <div class="stock-time">
-          {{ formatTime(stock.crawled_at || stock.time) }}
+          {{ formatTime(stock.time || stock.crawled_at) }}
         </div>
         
         <!-- 悬浮添加按钮 -->

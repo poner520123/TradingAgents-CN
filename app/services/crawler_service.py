@@ -713,15 +713,10 @@ class CrawlerService:
         # 最大爬取页面数，防止无限循环
         MAX_PAGES = 200
         
-        # 使用类变量累积计数，而不是局部变量
-        # 每次调用时从类变量获取当前计数，而不是重新初始化
-        if hasattr(self.__class__, 'total_pages_crawled'):
-            # 已经初始化过，继续累积
-            pass
-        else:
-            # 首次初始化
-            self.__class__.total_pages_crawled = 0
-            self.__class__.total_saved = 0
+        # 每次执行都重新计数，而不是累积计数
+        # 这样可以确保每次定时任务都能正常执行
+        self.__class__.total_pages_crawled = 0
+        self.__class__.total_saved = 0
         
         # 获取最近3个工作日的日期集合
         recent_workdays = set()

@@ -290,8 +290,19 @@ class ScrapyCrawlerService:
         
         data = list(self.popularity_collection.aggregate(pipeline))
         
-        # Get total count of unique stocks
-        total = self.popularity_collection.distinct("code").__len__()
+        # Get total count using aggregation instead of distinct (faster)
+        count_pipeline = [
+            {
+                "$group": {
+                    "_id": "$code"
+                }
+            },
+            {
+                "$count": "total"
+            }
+        ]
+        count_result = list(self.popularity_collection.aggregate(count_pipeline))
+        total = count_result[0]['total'] if count_result else 0
         
         # Convert ObjectId to string
         for d in data:
@@ -331,8 +342,19 @@ class ScrapyCrawlerService:
         
         data = list(self.capital_flow_collection.aggregate(pipeline))
         
-        # Get total count of unique stocks
-        total = self.capital_flow_collection.distinct("code").__len__()
+        # Get total count using aggregation instead of distinct (faster)
+        count_pipeline = [
+            {
+                "$group": {
+                    "_id": "$code"
+                }
+            },
+            {
+                "$count": "total"
+            }
+        ]
+        count_result = list(self.capital_flow_collection.aggregate(count_pipeline))
+        total = count_result[0]['total'] if count_result else 0
         
         # Convert ObjectId to string
         for d in data:
