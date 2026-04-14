@@ -423,10 +423,10 @@ class ScrapyCrawlerService:
         """Get cross analysis data with popularity and capital flow ranks."""
         from datetime import datetime, timedelta
         
-        # Get all expert ranking data first for de-duplication, filter by recent 7 days
-        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        # Get all expert ranking data first for de-duplication, filter by recent 30 days
+        one_month_ago = datetime.utcnow() - timedelta(days=30)
         cursor = self.expert_ranking_collection.find({
-            "crawled_at": {"$gte": one_week_ago}
+            "crawled_at": {"$gte": one_month_ago}
         })
         
         all_data = list(cursor)
@@ -533,17 +533,18 @@ class ScrapyCrawlerService:
         
         return final_data, total
     
-    def get_hot_experts_data(self, limit=15):
+    def get_hot_experts_data(self, limit=10):
         """Get hot experts data for dashboard.
         
         Extract cross analysis data where both popularity_rank and capital_flow_rank have values (>0),
-        sort by the sum of the latest values in ascending order, and extract the top N unique records.
+        count the number of experts (ambushers) for each stock in the last month,
+        sort by the number of ambushers in descending order, and extract the top N unique records.
         
         Args:
-            limit: Number of records to return
+            limit: Number of records to return, default is 10
         
         Returns:
-            List of hot experts data
+            List of hot experts data with ambusher count
         """
         from datetime import datetime, timedelta
         
@@ -565,22 +566,30 @@ class ScrapyCrawlerService:
                 item['combined_rank'] = popularity_rank + capital_flow_rank
                 filtered_data.append(item)
         
-        # Sort by combined_rank in ascending order (smaller sum means better rank)
-        filtered_data.sort(key=lambda x: x['combined_rank'])
-        
-        # Deduplicate by stock code, keep the record with the lowest combined_rank for each stock
-        unique_stocks = {}
+        # Count the number of ambushers (experts) for each stock in the last week
+        stock_ambushers = {}
         for item in filtered_data:
             stock_code = item.get('code')
-            if stock_code not in unique_stocks:
-                unique_stocks[stock_code] = item
+            if stock_code not in stock_ambushers:
+                stock_ambushers[stock_code] = {
+                    'item': item,
+                    'ambusher_count': 0,
+                    'experts': set()
+                }
+            # Add expert to the set to avoid duplicates
+            stock_ambushers[stock_code]['experts'].add(item.get('expert_name', ''))
         
-        # Convert back to list and sort again
-        unique_data = list(unique_stocks.values())
-        unique_data.sort(key=lambda x: x['combined_rank'])
+        # Calculate the final ambusher count for each stock
+        for stock_code, data in stock_ambushers.items():
+            data['ambusher_count'] = len(data['experts'])
+            data['item']['ambusher_count'] = data['ambusher_count']
+        
+        # Convert to list and sort by ambusher_count in descending order
+        sorted_data = [data['item'] for data in stock_ambushers.values()]
+        sorted_data.sort(key=lambda x: x.get('ambusher_count', 0), reverse=True)
         
         # Return top N records
-        return unique_data[:limit]
+        return sorted_data[:limit]
     
     def run_all_crawlers(self):
         """Run all crawlers sequentially."""

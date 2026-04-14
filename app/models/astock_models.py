@@ -94,6 +94,7 @@ class CrossAnalysisItem(BaseModel):
     capital_flow_rank: Optional[int] = Field(None, description="资金流向排名")
     limit_up: Optional[bool] = Field(None, description="是否涨停")
     crawled_at: Optional[datetime] = Field(None, description="爬取时间")
+    ambusher_count: Optional[int] = Field(None, description="伏击人数量")
     
     class Config:
         from_attributes = True
