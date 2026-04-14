@@ -566,7 +566,7 @@ class ScrapyCrawlerService:
                 item['combined_rank'] = popularity_rank + capital_flow_rank
                 filtered_data.append(item)
         
-        # Count the number of ambushers (experts) for each stock in the last week
+        # Count the number of ambushers (experts) for each stock in the last month
         stock_ambushers = {}
         for item in filtered_data:
             stock_code = item.get('code')
@@ -577,7 +577,9 @@ class ScrapyCrawlerService:
                     'experts': set()
                 }
             # Add expert to the set to avoid duplicates
-            stock_ambushers[stock_code]['experts'].add(item.get('expert_name', ''))
+            expert_name = item.get('expert_name')
+            if expert_name:
+                stock_ambushers[stock_code]['experts'].add(expert_name)
         
         # Calculate the final ambusher count for each stock
         for stock_code, data in stock_ambushers.items():
