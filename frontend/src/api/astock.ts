@@ -82,6 +82,7 @@ export interface CrossAnalysisItem {
   capital_flow_rank?: number
   limit_up?: boolean
   crawled_at?: string
+  ambusher_count?: number
 }
 
 export interface CrossAnalysisListResponse {

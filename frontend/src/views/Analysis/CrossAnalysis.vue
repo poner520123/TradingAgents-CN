@@ -69,6 +69,13 @@
             </span>
           </template>
         </el-table-column>
+        <el-table-column prop="ambusher_count" label="伏击人" width="80" align="center">
+          <template #default="scope">
+            <span :class="{ 'text-red-500': scope.row.ambusher_count > 0 }">
+              {{ scope.row.ambusher_count || '-' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="scope">
             <el-button size="small" type="primary" plain @click="analyzeStock(scope.row)">
