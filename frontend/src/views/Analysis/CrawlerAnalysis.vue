@@ -8,14 +8,12 @@
             <el-tag type="info" class="ml-2">178448.com</el-tag>
           </div>
           <div class="header-right" style="display: flex; align-items: center; gap: 10px;">
-          <el-input-number v-model="crawlPages" :min="1" :max="20" size="default" style="width: 120px;" />
           <el-button 
-            type="primary" 
+            type="info" 
             size="default" 
-            @click="handleStartCrawl" 
-            :disabled="crawling"
+            disabled
           >
-            手动爬取
+            自动爬取中 (每5分钟)
           </el-button>
         </div>
         </div>
@@ -179,12 +177,10 @@ import { formatDateTime } from '@/utils/datetime'
 
 const router = useRouter()
 const loading = ref(false)
-const crawling = ref(false)
 const tableData = ref<CrawlerData[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const crawlPages = ref(5)
 
 // 筛选表单数据
 const filterForm = ref({
@@ -318,32 +314,7 @@ const fetchStockCodes = async () => {
   }
 }
 
-const handleStartCrawl = async () => {
-  crawling.value = true
-  try {
-    const res = await startCrawl(crawlPages.value)
-    if (res.success) {
-      ElMessage.success(`开始爬取前 ${crawlPages.value} 页数据，请稍后刷新查看`)
-      // 由于实际爬取在后台进行，我们需要保持爬取状态一段时间
-      setTimeout(() => {
-        fetchData()
-      }, 2000)
-      // 30秒后重置状态，模拟实际爬取时间
-      setTimeout(() => {
-        if (crawling.value) {
-          crawling.value = false
-        }
-      }, 30000)
-    } else {
-      ElMessage.error(res.message || '启动爬取失败')
-      crawling.value = false
-    }
-  } catch (error) {
-    console.error('Failed to start crawl:', error)
-    ElMessage.error('启动爬取失败')
-    crawling.value = false
-  }
-}
+
 
 const analyzeStock = (row: CrawlerData) => {
   // 如果有股票代码，直接使用股票代码，否则使用股票名称
@@ -479,7 +450,34 @@ const closeCrawlerStatus = () => {
 
 // 组件卸载时清理资源
 onUnmounted(() => {
-  // 无资源需要清理
+  // 清理轮询定时器
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value)
+  }
+})
+
+// 轮询定时器
+const pollingTimer = ref<number | null>(null)
+
+// 开始轮询检查数据更新
+const startPolling = () => {
+  // 每5分钟检查一次数据更新
+  pollingTimer.value = window.setInterval(async () => {
+    console.log('🔄 检查数据更新...')
+    // 只在当前页面是第一页时才自动刷新
+    if (currentPage.value === 1) {
+      await fetchData()
+    }
+  }, 5 * 60 * 1000) // 5分钟
+  console.log('✅ 开始自动数据更新检查 (每5分钟)')
+}
+
+// 页面加载时启动轮询
+onMounted(async () => {
+  await loadStockNameCodeMap()
+  await fetchTopUsers()
+  await fetchData()
+  startPolling()
 })
 </script>
 

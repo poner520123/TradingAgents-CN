@@ -43,6 +43,9 @@ class CrawlerService:
         self.consecutive_errors = 0
         self.max_consecutive_errors = 3
         self.reset_cooldown = timedelta(seconds=30)
+        
+        # 添加任务执行锁，确保同一时间只有一个爬虫任务在执行
+        self.is_running = False
     
     def _init_db(self):
         """Initialize database indexes."""
@@ -766,24 +769,33 @@ class CrawlerService:
 
     def crawl_pages(self, start_page, end_page, force=False):
         """Crawl pages with enhanced thread stability."""
-        # Logic similar to original but with enhanced error handling and smart page adjustment
-        from app.routers.websocket_notifications import send_notification_via_websocket
-        import asyncio
+        # 检查是否已经有爬虫任务在执行
+        if self.is_running and not force:
+            logger.info("爬虫任务已经在执行中，跳过本次执行")
+            return 0
         
-        # 记录已获取的日期范围
-        collected_dates = set()
-        # 初始爬取页面范围
-        current_start_page = start_page
-        current_end_page = end_page
-        # 标记是否已经覆盖了最近3个工作日
-        has_covered_recent_workdays = False
-        # 最大爬取页面数，防止无限循环
-        MAX_PAGES = 200
+        # 设置执行状态为运行中
+        self.is_running = True
         
-        # 每次执行都重新计数，而不是累积计数
-        # 这样可以确保每次定时任务都能正常执行
-        self.__class__.total_pages_crawled = 0
-        self.__class__.total_saved = 0
+        try:
+            # Logic similar to original but with enhanced error handling and smart page adjustment
+            from app.routers.websocket_notifications import send_notification_via_websocket
+            import asyncio
+            
+            # 记录已获取的日期范围
+            collected_dates = set()
+            # 初始爬取页面范围
+            current_start_page = start_page
+            current_end_page = end_page
+            # 标记是否已经覆盖了最近3个工作日
+            has_covered_recent_workdays = False
+            # 最大爬取页面数，防止无限循环
+            MAX_PAGES = 200
+            
+            # 每次执行都重新计数，而不是累积计数
+            # 这样可以确保每次定时任务都能正常执行
+            self.__class__.total_pages_crawled = 0
+            self.__class__.total_saved = 0
         
         # 获取最近3个工作日的日期集合
         recent_workdays = set()
@@ -960,8 +972,13 @@ class CrawlerService:
             
             # 发送爬取完成通知
             # 爬取完成已通过日志记录，无需额外通知
+            
+            return self.__class__.total_saved
         
-        return self.__class__.total_saved
+        finally:
+            # 无论任务是否成功完成，都将执行状态设置为未运行
+            self.is_running = False
+            logger.info("爬虫任务执行完成，释放执行锁")
 
 
 # 单例实例
