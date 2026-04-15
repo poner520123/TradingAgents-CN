@@ -144,7 +144,7 @@ async def get_cross_analysis_data(
 
 @router.get("/hot-experts", response_model=CrossAnalysisListResponse, tags=["astock"])
 async def get_hot_experts_data(
-    limit: int = 15,
+    limit: int = 20,
     service: ScrapyCrawlerService = Depends(get_scrapy_crawler_service)
 ):
     """

@@ -646,6 +646,10 @@ async def lifespan(app: FastAPI):
         from app.services.crawler_service import CrawlerService
         from app.services.scrapy_crawler_service import ScrapyCrawlerService
 
+        # 创建服务实例，避免每次执行都创建新的实例
+        crawler_service = CrawlerService()
+        scrapy_service = ScrapyCrawlerService()
+        
         # 定义所有爬虫任务
         async def run_all_crawlers():
             """运行所有爬虫任务 - 包括CrawlerService和ScrapyCrawlerService"""
@@ -653,18 +657,18 @@ async def lifespan(app: FastAPI):
                 logger.info("开始执行所有爬虫任务...")
                 
                 # 1. 运行CrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
-                crawler_service = CrawlerService()
                 crawler_total = await asyncio.to_thread(crawler_service.crawl_pages, 1, 20)
                 logger.info(f"CrawlerService爬虫完成: 保存了 {crawler_total} 条新数据")
                 
                 # 2. 运行ScrapyCrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
-                scrapy_service = ScrapyCrawlerService()
                 scrapy_total = await asyncio.to_thread(scrapy_service.run_all_crawlers)
                 logger.info(f"ScrapyCrawlerService爬虫完成: 保存了 {scrapy_total} 条新数据")
                 
                 logger.info(f"所有爬虫任务完成: 总共保存了 {crawler_total + scrapy_total} 条新数据")
             except Exception as e:
                 logger.error(f"爬虫任务失败: {e}", exc_info=True)
+            finally:
+                logger.info("爬虫任务执行完成")
 
         # 配置爬虫定时任务，按照配置的间隔执行
         scheduler.add_job(

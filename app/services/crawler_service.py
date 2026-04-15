@@ -790,7 +790,7 @@ class CrawlerService:
             # 标记是否已经覆盖了最近3个工作日
             has_covered_recent_workdays = False
             # 最大爬取页面数，防止无限循环
-            MAX_PAGES = 200
+            MAX_PAGES = 50
             
             # 每次执行都重新计数，而不是累积计数
             # 这样可以确保每次定时任务都能正常执行

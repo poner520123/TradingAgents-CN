@@ -80,19 +80,19 @@ HEADERS = get_random_headers()
 DELAY_CONFIG = {
     # Base delay ranges (in seconds)
     # Successful page fetch - shorter delay range
-    "success_delay_range": (2, 5),  # 增加成功请求的延迟范围
+    "success_delay_range": (0.5, 1.5),  # 减少成功请求的延迟范围
     # Failed page fetch - longer delay range
-    "failure_delay_range": (6, 10),  # 增加失败请求的延迟范围
+    "failure_delay_range": (2, 4),  # 减少失败请求的延迟范围
     # Extra random pause that can be inserted occasionally
-    "random_pause_range": (10, 20),  # 增加随机暂停时间
+    "random_pause_range": (3, 5),  # 减少随机暂停时间
     # Probability of inserting an extra random pause (0.0-1.0)
-    "random_pause_probability": 0.15,  # 增加随机暂停概率
+    "random_pause_probability": 0.05,  # 减少随机暂停概率
     # Jitter factor to add small random variations to delays
-    "jitter_factor": 0.25,  # 增加抖动因子
+    "jitter_factor": 0.1,  # 减少抖动因子
     # Maximum consecutive requests before a mandatory longer pause
-    "max_consecutive_requests": 3,  # 减少连续请求次数
+    "max_consecutive_requests": 5,  # 增加连续请求次数
     # Mandatory longer pause after max_consecutive_requests (seconds)
-    "mandatory_pause_range": (15, 25)  # 增加强制暂停时间
+    "mandatory_pause_range": (5, 8)  # 减少强制暂停时间
 }
 
 def get_random_delay(delay_type="success"):

@@ -27,6 +27,9 @@ class ScrapyCrawlerService:
         
         # Scrapy project path
         self.scrapy_project_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scrapy_project', 'crawler')
+        
+        # 添加任务执行锁，确保同一时间只有一个爬虫任务在执行
+        self.is_running = False
     
     def _init_indexes(self):
         """Initialize database indexes."""
@@ -531,13 +534,33 @@ class ScrapyCrawlerService:
             
             final_data.append(item)
         
+        # Count the number of ambushers (experts) for each stock in the last month
+        stock_ambushers = {}
+        for item in final_data:
+            stock_code = item.get('code')
+            if stock_code not in stock_ambushers:
+                stock_ambushers[stock_code] = {
+                    'experts': set()
+                }
+            # Add expert to the set to avoid duplicates
+            expert_name = item.get('expert_name')
+            if expert_name:
+                stock_ambushers[stock_code]['experts'].add(expert_name)
+        
+        # Calculate the final ambusher count for each stock and add to the item
+        for item in final_data:
+            stock_code = item.get('code')
+            if stock_code in stock_ambushers:
+                item['ambusher_count'] = len(stock_ambushers[stock_code]['experts'])
+            else:
+                item['ambusher_count'] = 0
+        
         return final_data, total
     
     def get_hot_experts_data(self, limit=10):
         """Get hot experts data for dashboard.
         
         Extract cross analysis data where both popularity_rank and capital_flow_rank have values (>0),
-        count the number of experts (ambushers) for each stock in the last month,
         sort by the number of ambushers in descending order, and extract the top N unique records.
         
         Args:
@@ -546,9 +569,7 @@ class ScrapyCrawlerService:
         Returns:
             List of hot experts data with ambusher count
         """
-        from datetime import datetime, timedelta
-        
-        # Get cross analysis data with popularity and capital flow ranks
+        # Get cross analysis data with popularity, capital flow ranks, and ambusher count
         cross_data, _ = self.get_cross_analysis_data(page=1, page_size=1000)  # Get all data first
         
         # Filter data where both popularity_rank and capital_flow_rank are not None and > 0
@@ -566,47 +587,39 @@ class ScrapyCrawlerService:
                 item['combined_rank'] = popularity_rank + capital_flow_rank
                 filtered_data.append(item)
         
-        # Count the number of ambushers (experts) for each stock in the last month
-        stock_ambushers = {}
-        for item in filtered_data:
-            stock_code = item.get('code')
-            if stock_code not in stock_ambushers:
-                stock_ambushers[stock_code] = {
-                    'item': item,
-                    'ambusher_count': 0,
-                    'experts': set()
-                }
-            # Add expert to the set to avoid duplicates
-            expert_name = item.get('expert_name')
-            if expert_name:
-                stock_ambushers[stock_code]['experts'].add(expert_name)
-        
-        # Calculate the final ambusher count for each stock
-        for stock_code, data in stock_ambushers.items():
-            data['ambusher_count'] = len(data['experts'])
-            data['item']['ambusher_count'] = data['ambusher_count']
-        
         # Convert to list and sort by ambusher_count in descending order
-        sorted_data = [data['item'] for data in stock_ambushers.values()]
-        sorted_data.sort(key=lambda x: x.get('ambusher_count', 0), reverse=True)
+        filtered_data.sort(key=lambda x: x.get('ambusher_count', 0), reverse=True)
         
         # Return top N records
-        return sorted_data[:limit]
+        return filtered_data[:limit]
     
     def run_all_crawlers(self):
         """Run all crawlers sequentially."""
-        logger.info("🚀 Running all Scrapy crawlers...")
+        # 检查是否已经有爬虫任务在执行
+        if self.is_running:
+            logger.info("爬虫任务已经在执行中，跳过本次执行")
+            return 0
         
-        total_saved = 0
+        # 设置执行状态为运行中
+        self.is_running = True
         
-        # Run popularity crawler
-        total_saved += self.crawl_popularity()
-        
-        # Run capital flow crawler
-        total_saved += self.crawl_capital_flow()
-        
-        # Run expert ranking crawler
-        total_saved += self.crawl_expert_ranking()
-        
-        logger.info(f"✅ All crawlers completed. Total new records saved: {total_saved}")
-        return total_saved
+        try:
+            logger.info("🚀 Running all Scrapy crawlers...")
+            
+            total_saved = 0
+            
+            # Run popularity crawler
+            total_saved += self.crawl_popularity()
+            
+            # Run capital flow crawler
+            total_saved += self.crawl_capital_flow()
+            
+            # Run expert ranking crawler
+            total_saved += self.crawl_expert_ranking()
+            
+            logger.info(f"✅ All crawlers completed. Total new records saved: {total_saved}")
+            return total_saved
+        finally:
+            # 无论任务是否成功完成，都将执行状态设置为未运行
+            self.is_running = False
+            logger.info("爬虫任务执行完成，释放执行锁")

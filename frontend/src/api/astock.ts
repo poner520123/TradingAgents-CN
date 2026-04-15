@@ -167,3 +167,20 @@ export function runAstockCrawlers() {
     method: 'post'
   })
 }
+
+/**
+ * 获取热点达人数据
+ */
+export function getHotExpertsData(limit: number = 10) {
+  return request<{
+    success: boolean
+    message: string | null
+    data: CrossAnalysisItem[]
+  }>({
+    url: '/api/astock/hot-experts',
+    method: 'get',
+    params: {
+      limit
+    }
+  })
+}
