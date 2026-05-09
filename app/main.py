@@ -657,7 +657,8 @@ async def lifespan(app: FastAPI):
                 logger.info("开始执行所有爬虫任务...")
                 
                 # 1. 运行CrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
-                crawler_total = await asyncio.to_thread(crawler_service.crawl_pages, 1, 20)
+                # 减少爬取页面范围，确保在5分钟内完成
+                crawler_total = await asyncio.to_thread(crawler_service.crawl_pages, 1, 10)
                 logger.info(f"CrawlerService爬虫完成: 保存了 {crawler_total} 条新数据")
                 
                 # 2. 运行ScrapyCrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
@@ -671,12 +672,14 @@ async def lifespan(app: FastAPI):
                 logger.info("爬虫任务执行完成")
 
         # 配置爬虫定时任务，按照配置的间隔执行
+        # misfire_grace_time设置为6分钟，确保任务执行时间稍长时不会被跳过
         scheduler.add_job(
             run_all_crawlers,
             IntervalTrigger(minutes=settings.CRAWLER_INTERVAL_MINUTES, timezone=settings.TIMEZONE),
             id="all_crawlers_task",
             name="所有爬虫任务",
-            replace_existing=True
+            replace_existing=True,
+            misfire_grace_time=360  # 6分钟，确保任务执行时间稍长时不会被跳过
         )
         logger.info(f"所有爬虫任务已配置: 每 {settings.CRAWLER_INTERVAL_MINUTES} 分钟执行一次")
 

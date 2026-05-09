@@ -344,6 +344,8 @@ class CrawlerService:
                 # Date parsing logic
                 try:
                     ts = time_str.strip()
+                    # Replace multiple spaces with single space to handle inconsistent formatting
+                    ts = ' '.join(ts.split())
                     if '-' in ts:
                         fmt = '%Y-%m-%d %H:%M' if ':' in ts else '%Y-%m-%d'
                     elif '/' in ts:
@@ -352,6 +354,7 @@ class CrawlerService:
                         continue
                     row_date = datetime.strptime(ts, fmt)
                 except ValueError:
+                    logger.warning(f"Failed to parse date: {repr(time_str)}")
                     continue
                 
                 # Filter by date (only keep recent)
@@ -789,8 +792,8 @@ class CrawlerService:
             current_end_page = end_page
             # 标记是否已经覆盖了最近3个工作日
             has_covered_recent_workdays = False
-            # 最大爬取页面数，防止无限循环
-            MAX_PAGES = 50
+            # 最大爬取页面数，防止无限循环，确保在5分钟内完成
+            MAX_PAGES = 20
             
             # 每次执行都重新计数，而不是累积计数
             # 这样可以确保每次定时任务都能正常执行

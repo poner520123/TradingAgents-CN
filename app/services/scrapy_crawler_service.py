@@ -13,23 +13,42 @@ class ScrapyCrawlerService:
     """Handles Scrapy crawler execution and data management."""
     
     def __init__(self):
-        # Initialize MongoDB connection
-        self.client = MongoClient(settings.MONGO_URI)
-        self.db = self.client[settings.MONGO_DB]
+        # Initialize MongoDB connection with fallback
+        self.client = None
+        self.db = None
+        self.popularity_collection = None
+        self.capital_flow_collection = None
+        self.expert_ranking_collection = None
+        self.mongodb_available = False
         
-        # Create collections
-        self.popularity_collection = self.db.popularity_data
-        self.capital_flow_collection = self.db.capital_flow_data
-        self.expert_ranking_collection = self.db.expert_ranking_data
-        
-        # Initialize indexes
-        self._init_indexes()
+        try:
+            self.client = MongoClient(settings.MONGO_URI)
+            # Test connection
+            self.client.admin.command('ping')
+            self.db = self.client[settings.MONGO_DB]
+            
+            # Create collections
+            self.popularity_collection = self.db.popularity_data
+            self.capital_flow_collection = self.db.capital_flow_data
+            self.expert_ranking_collection = self.db.expert_ranking_data
+            
+            # Initialize indexes
+            self._init_indexes()
+            self.mongodb_available = True
+            logger.info("✅ MongoDB连接成功")
+        except Exception as e:
+            logger.error(f"❌ MongoDB连接失败: {e}")
+            logger.info("将使用本地文件存储作为备选方案")
         
         # Scrapy project path
         self.scrapy_project_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scrapy_project', 'crawler')
         
         # 添加任务执行锁，确保同一时间只有一个爬虫任务在执行
         self.is_running = False
+        
+        # 本地文件存储路径
+        self.data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+        os.makedirs(self.data_dir, exist_ok=True)
     
     def _init_indexes(self):
         """Initialize database indexes."""
@@ -111,7 +130,7 @@ class ScrapyCrawlerService:
             return []
     
     def save_popularity_data(self, data):
-        """Save popularity ranking data to database."""
+        """Save popularity ranking data to database or local file."""
         if not data:
             return 0
         
@@ -122,6 +141,7 @@ class ScrapyCrawlerService:
         # Get current timestamp for all items
         current_time = datetime.utcnow()
         
+        processed_data = []
         for item in data:
             try:
                 # Add crawled_at timestamp
@@ -142,19 +162,35 @@ class ScrapyCrawlerService:
                     if stock_name:
                         item['name'] = stock_name
                 
-                # Upsert based on code, but always update with latest data
-                # We want to keep all data with different crawled_at timestamps
-                # to allow historical analysis
-                self.popularity_collection.insert_one(item)
-                count += 1
+                processed_data.append(item)
             except Exception as e:
-                logger.error(f"❌ Error saving popularity data: {e}")
+                logger.error(f"❌ Error processing popularity data: {e}")
         
-        logger.info(f"✅ Saved {count} new popularity records")
+        # Try MongoDB first
+        if self.mongodb_available and self.popularity_collection is not None:
+            try:
+                result = self.popularity_collection.insert_many(processed_data)
+                count = len(result.inserted_ids)
+                logger.info(f"✅ Saved {count} new popularity records to MongoDB")
+                return count
+            except Exception as e:
+                logger.error(f"❌ Error saving popularity data to MongoDB: {e}")
+        
+        # Fallback to local file
+        try:
+            filename = f"popularity_{current_time.strftime('%Y%m%d_%H%M%S')}.json"
+            filepath = os.path.join(self.data_dir, filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(processed_data, f, ensure_ascii=False, indent=2)
+            count = len(processed_data)
+            logger.info(f"✅ Saved {count} new popularity records to local file: {filepath}")
+        except Exception as e:
+            logger.error(f"❌ Error saving popularity data to local file: {e}")
+        
         return count
     
     def save_capital_flow_data(self, data):
-        """Save capital flow data to database."""
+        """Save capital flow data to database or local file."""
         if not data:
             return 0
         
@@ -165,6 +201,7 @@ class ScrapyCrawlerService:
         # Get current timestamp for all items
         current_time = datetime.utcnow()
         
+        processed_data = []
         for item in data:
             try:
                 # Add crawled_at timestamp
@@ -176,18 +213,35 @@ class ScrapyCrawlerService:
                     if stock_name:
                         item['name'] = stock_name
                 
-                # Insert new record instead of upserting
-                # to keep all historical data
-                self.capital_flow_collection.insert_one(item)
-                count += 1
+                processed_data.append(item)
             except Exception as e:
-                logger.error(f"❌ Error saving capital flow data: {e}")
+                logger.error(f"❌ Error processing capital flow data: {e}")
         
-        logger.info(f"✅ Saved {count} new capital flow records")
+        # Try MongoDB first
+        if self.mongodb_available and self.capital_flow_collection is not None:
+            try:
+                result = self.capital_flow_collection.insert_many(processed_data)
+                count = len(result.inserted_ids)
+                logger.info(f"✅ Saved {count} new capital flow records to MongoDB")
+                return count
+            except Exception as e:
+                logger.error(f"❌ Error saving capital flow data to MongoDB: {e}")
+        
+        # Fallback to local file
+        try:
+            filename = f"capital_flow_{current_time.strftime('%Y%m%d_%H%M%S')}.json"
+            filepath = os.path.join(self.data_dir, filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(processed_data, f, ensure_ascii=False, indent=2)
+            count = len(processed_data)
+            logger.info(f"✅ Saved {count} new capital flow records to local file: {filepath}")
+        except Exception as e:
+            logger.error(f"❌ Error saving capital flow data to local file: {e}")
+        
         return count
     
     def save_expert_ranking_data(self, data):
-        """Save expert ranking data to database."""
+        """Save expert ranking data to database or local file."""
         if not data:
             return 0
         
@@ -198,6 +252,7 @@ class ScrapyCrawlerService:
         # Get current timestamp for all items
         current_time = datetime.utcnow()
         
+        processed_data = []
         for item in data:
             try:
                 # Add crawled_at timestamp
@@ -215,24 +270,42 @@ class ScrapyCrawlerService:
                         if stock_name:
                             item['name'] = stock_name
                 
-                # Upsert based on expert_name, code, and analysis_time
-                # This ensures we don't duplicate the same analysis
-                result = self.expert_ranking_collection.update_one(
-                    {
-                        "expert_name": item["expert_name"],
-                        "code": item["code"],
-                        "analysis_time": item["analysis_time"]
-                    }, 
-                    {"$set": item}, 
-                    upsert=True
-                )
-                
-                if result.upserted_id or result.modified_count > 0:
-                    count += 1
+                processed_data.append(item)
             except Exception as e:
-                logger.error(f"❌ Error saving expert ranking data: {e}")
+                logger.error(f"❌ Error processing expert ranking data: {e}")
         
-        logger.info(f"✅ Saved {count} expert ranking records (new: {count})")
+        # Try MongoDB first
+        if self.mongodb_available and self.expert_ranking_collection is not None:
+            try:
+                for item in processed_data:
+                    # Upsert based on expert_name, code, and analysis_time
+                    result = self.expert_ranking_collection.update_one(
+                        {
+                            "expert_name": item["expert_name"],
+                            "code": item["code"],
+                            "analysis_time": item["analysis_time"]
+                        }, 
+                        {"$set": item}, 
+                        upsert=True
+                    )
+                    if result.upserted_id or result.modified_count > 0:
+                        count += 1
+                logger.info(f"✅ Saved {count} expert ranking records to MongoDB")
+                return count
+            except Exception as e:
+                logger.error(f"❌ Error saving expert ranking data to MongoDB: {e}")
+        
+        # Fallback to local file
+        try:
+            filename = f"expert_ranking_{current_time.strftime('%Y%m%d_%H%M%S')}.json"
+            filepath = os.path.join(self.data_dir, filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(processed_data, f, ensure_ascii=False, indent=2)
+            count = len(processed_data)
+            logger.info(f"✅ Saved {count} expert ranking records to local file: {filepath}")
+        except Exception as e:
+            logger.error(f"❌ Error saving expert ranking data to local file: {e}")
+        
         return count
     
     def crawl_popularity(self):
