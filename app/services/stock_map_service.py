@@ -10,6 +10,17 @@ import json
 
 logger = logging.getLogger(__name__)
 
+# 常见股票名称列表，用于验证映射表完整性
+COMMON_STOCK_NAMES = [
+    "贵州茅台", "宁德时代", "比亚迪", "招商银行", "五粮液",
+    "中国平安", "美的集团", "格力电器", "恒瑞医药", "海天味业",
+    "迈瑞医疗", "立讯精密", "药明康德", "隆基绿能", "阳光电源",
+    "比亚迪", "长城汽车", "长安汽车", "上汽集团", "广汽集团",
+    "工商银行", "建设银行", "农业银行", "中国银行", "交通银行",
+    "中国石油", "中国石化", "中国神华", "兖矿能源", "中煤能源",
+    "北投科技", "北新建材", "万科A", "保利发展", "招商蛇口"
+]
+
 class StockMapService:
     """股票名称到代码的映射服务"""
     
@@ -18,6 +29,8 @@ class StockMapService:
         self.client = None
         self.db = None
         self.collection = None
+        self.initialization_complete = False
+        self.load_errors = []
         
         # 尝试初始化MongoDB连接
         try:
@@ -31,6 +44,7 @@ class StockMapService:
             logger.info("✅ MongoDB连接成功，股票映射服务初始化完成")
         except Exception as e:
             logger.warning(f"⚠️ MongoDB连接失败: {e}，将使用内存缓存模式")
+            self.load_errors.append(f"MongoDB连接失败: {e}")
             self.mongodb_available = False
         
         # 初始化内存缓存
@@ -42,10 +56,19 @@ class StockMapService:
         
         # 检查并同步映射（如果需要）
         self.sync_mappings_if_needed()
+        
+        # 验证映射表完整性
+        self.validate_integrity()
+        
+        # 标记初始化完成
+        self.initialization_complete = True
+        logger.info("✅ 股票映射服务初始化全部完成")
     
     def _rebuild_cache(self):
         """从数据库重建内存缓存"""
-        logger.info("开始从数据库重建内存缓存")
+        logger.info("=" * 60)
+        logger.info("📦 开始从数据库重建内存缓存")
+        logger.info("=" * 60)
         
         # 清空现有缓存
         self.name_to_code.clear()
@@ -68,15 +91,20 @@ class StockMapService:
                         self.code_to_name[code] = name
                         count += 1
                 
-                logger.info(f"内存缓存重建完成，共加载 {count} 条映射")
+                logger.info(f"✅ 内存缓存重建完成，共加载 {count} 条映射")
+                logger.info(f"📊 缓存状态: name_to_code={len(self.name_to_code)}, code_to_name={len(self.code_to_name)}")
             except Exception as e:
-                logger.warning(f"⚠️ 从数据库加载映射失败: {e}")
+                error_msg = f"⚠️ 从数据库加载映射失败: {e}"
+                logger.warning(error_msg)
+                self.load_errors.append(error_msg)
         else:
-            logger.info("MongoDB不可用，使用空缓存")
+            logger.info("⚠️ MongoDB不可用，使用空缓存")
         
+        logger.info("=" * 60)
+    
     def load_from_csv(self, csv_path: str) -> int:
         """从CSV文件加载股票名称到代码的映射"""
-        logger.info(f"开始从CSV文件加载股票名称到代码的映射: {csv_path}")
+        logger.info(f"📥 开始从CSV文件加载股票名称到代码的映射: {csv_path}")
         count = 0
         
         try:
@@ -95,13 +123,15 @@ class StockMapService:
                             success = self.upsert_map(name, code, market)
                             if success:
                                 count += 1
+            logger.info(f"✅ 从CSV文件加载股票名称到代码的映射完成，共处理 {count} 条记录")
         except Exception as e:
-            logger.error(f"从CSV文件加载股票名称到代码的映射失败: {e}")
+            error_msg = f"❌ 从CSV文件加载股票名称到代码的映射失败: {e}"
+            logger.error(error_msg)
+            self.load_errors.append(error_msg)
             return 0
         
         # 重新构建内存缓存
         self._rebuild_cache()
-        logger.info(f"从CSV文件加载股票名称到代码的映射完成，共处理 {count} 条记录")
         return count
     
     def should_sync_mappings(self) -> bool:
@@ -110,32 +140,99 @@ class StockMapService:
         if self.mongodb_available and self.collection is not None:
             try:
                 count = self.collection.count_documents({})
-                logger.info(f"数据库中已有 {count} 条股票映射记录")
+                logger.info(f"📊 数据库中已有 {count} 条股票映射记录")
                 # 如果已有记录，则不需要同步
                 return count == 0
             except Exception as e:
-                logger.warning(f"检查数据库映射数量失败: {e}")
+                logger.warning(f"⚠️ 检查数据库映射数量失败: {e}")
                 # 出错时默认需要同步
                 return True
         else:
             # MongoDB不可用时，检查内存缓存
-            logger.info(f"内存缓存中有 {len(self.name_to_code)} 条股票映射记录")
+            logger.info(f"📊 内存缓存中有 {len(self.name_to_code)} 条股票映射记录")
             return len(self.name_to_code) == 0
     
     def sync_mappings_if_needed(self) -> Dict[str, int]:
         """如果需要，同步股票映射"""
+        logger.info("🔄 检查是否需要同步股票映射...")
+        
         if not self.should_sync_mappings():
-            logger.info("股票映射已存在，跳过同步")
+            logger.info("⏭️ 股票映射已存在，跳过同步")
             return {"status": "skipped", "message": "映射已存在"}
         
-        logger.info("开始同步股票映射")
+        logger.info("🚀 开始同步股票映射")
         
         # 从配置文件加载映射
         csv_path = "config/stock_mappings.csv"
         loaded_count = self.load_from_csv(csv_path)
         
-        logger.info(f"股票映射同步完成，从CSV加载 {loaded_count} 条记录")
+        logger.info(f"✅ 股票映射同步完成，从CSV加载 {loaded_count} 条记录")
         return {"status": "success", "loaded": loaded_count}
+    
+    def validate_integrity(self) -> Dict[str, any]:
+        """验证映射表完整性"""
+        logger.info("=" * 60)
+        logger.info("🔍 开始验证映射表完整性")
+        logger.info("=" * 60)
+        
+        missing_stocks = []
+        found_stocks = []
+        
+        for stock_name in COMMON_STOCK_NAMES:
+            code = self.get_code_by_name(stock_name)
+            if code:
+                found_stocks.append((stock_name, code))
+            else:
+                missing_stocks.append(stock_name)
+        
+        # 记录验证结果
+        if found_stocks:
+            logger.info(f"✅ 已找到 {len(found_stocks)} 个常见股票:")
+            for name, code in found_stocks[:5]:  # 只显示前5个
+                logger.info(f"   • {name} -> {code}")
+            if len(found_stocks) > 5:
+                logger.info(f"   • ... 还有 {len(found_stocks) - 5} 个")
+        
+        if missing_stocks:
+            logger.warning(f"⚠️ 未找到 {len(missing_stocks)} 个常见股票:")
+            for name in missing_stocks:
+                logger.warning(f"   • {name}")
+            self.load_errors.extend([f"缺失常见股票: {name}" for name in missing_stocks])
+        else:
+            logger.info("✅ 所有常见股票均已包含")
+        
+        # 验证缓存一致性
+        # 注意：name_to_code 和 code_to_name 的长度可能不同，因为一只股票可能有多个名称
+        # 但 code_to_name 的数量应该 <= name_to_code 的数量
+        cache_consistent = len(self.code_to_name) <= len(self.name_to_code)
+        if not cache_consistent:
+            logger.warning(f"⚠️ 缓存不一致: name_to_code={len(self.name_to_code)}, code_to_name={len(self.code_to_name)}")
+            self.load_errors.append("缓存数据不一致")
+        else:
+            # 正常情况：code_to_name <= name_to_code（一只股票可能有多个名称）
+            logger.info(f"✅ 缓存数据一致: name_to_code={len(self.name_to_code)}, code_to_name={len(self.code_to_name)}")
+        
+        logger.info("=" * 60)
+        
+        return {
+            "total_common_stocks": len(COMMON_STOCK_NAMES),
+            "found_count": len(found_stocks),
+            "missing_count": len(missing_stocks),
+            "missing_stocks": missing_stocks,
+            "cache_consistent": cache_consistent,
+            "total_mappings": len(self.name_to_code)
+        }
+    
+    def get_initialization_status(self) -> Dict[str, any]:
+        """获取初始化状态信息"""
+        return {
+            "initialized": self.initialization_complete,
+            "mongodb_available": self.mongodb_available,
+            "total_mappings": self.get_total_count(),
+            "cache_size": len(self.name_to_code),
+            "errors": self.load_errors,
+            "status": "healthy" if not self.load_errors else "degraded"
+        }
     
     def _get_market_by_code(self, code: str) -> str:
         """根据股票代码确定市场类型"""
@@ -154,10 +251,8 @@ class StockMapService:
     
     def get_code_by_name(self, name: str) -> Optional[str]:
         """根据股票名称获取股票代码"""
-        logger.info(f"根据股票名称获取股票代码: {name}")
         # 先从缓存查询
         if name in self.name_to_code:
-            logger.info(f"从缓存获取股票代码: {name} -> {self.name_to_code[name]}")
             return self.name_to_code[name]
         
         # 如果缓存中没有，且MongoDB可用，从数据库查询
@@ -174,26 +269,22 @@ class StockMapService:
                 logger.warning(f"⚠️ 从数据库查询失败: {e}")
         
         # 如果数据库中没有或MongoDB不可用，通过API查询
-        logger.info(f"数据库中未找到股票代码或MongoDB不可用，通过API查询: {name}")
         code = self._get_stock_code_from_api(name)
         if code:
             # 将查询结果保存到数据库（如果MongoDB可用）
             if self.mongodb_available:
                 market = self._get_market_by_code(code)
                 self.upsert_map(name, code, market)
-                logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到数据库")
             else:
                 # 只更新内存缓存
                 self.name_to_code[name] = code
                 self.code_to_name[code] = name
-                logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到内存缓存")
             return code
         
         return None
     
     def get_codes_by_names(self, names: List[str]) -> Dict[str, str]:
         """根据股票名称列表批量获取股票代码"""
-        logger.info(f"根据股票名称列表批量获取股票代码: {names}")
         result = {}
         
         # 1. 优先使用内存缓存
@@ -206,9 +297,6 @@ class StockMapService:
                 cached_names.append(name)
             else:
                 missing_names.append(name)
-        
-        if cached_names:
-            logger.info(f"从内存缓存获取到 {len(cached_names)} 个股票代码")
         
         if not missing_names:
             return result
@@ -224,14 +312,9 @@ class StockMapService:
                     self.name_to_code[map_data["name"]] = map_data["code"]
                     self.code_to_name[map_data["code"]] = map_data["name"]
                     db_found.append(map_data["name"])
-                
-                if db_found:
-                    logger.info(f"从数据库获取到 {len(db_found)} 个股票代码")
             except Exception as e:
                 logger.warning(f"⚠️ 批量查询数据库失败: {e}")
                 db_found = []
-        else:
-            logger.info("MongoDB不可用，跳过数据库查询")
         
         # 3. 找出数据库中也没有的股票名称
         api_names = [name for name in missing_names if name not in db_found]
@@ -239,9 +322,8 @@ class StockMapService:
             return result
         
         # 4. 只对少量缺失的股票进行API查询，避免大量耗时请求
-        max_api_queries = 10  # 限制最大API查询数量
+        max_api_queries = 10
         api_query_names = api_names[:max_api_queries]
-        logger.info(f"数据库中缺少 {len(api_names)} 个股票代码，将对前 {len(api_query_names)} 个进行API查询")
         
         for name in api_query_names:
             try:
@@ -251,22 +333,13 @@ class StockMapService:
                     market = self._get_market_by_code(code)
                     self.upsert_map(name, code, market)
                     result[name] = code
-                    logger.info(f"通过API查询到股票代码: {name} -> {code}，已保存到数据库")
             except Exception as e:
                 logger.error(f"查询股票代码失败: {name}，错误: {e}")
-                # 继续处理其他股票名称，不中断整个流程
-        
-        # 记录未找到的股票名称
-        not_found_names = [name for name in api_names if name not in result]
-        if not_found_names:
-            logger.info(f"未找到 {len(not_found_names)} 个股票代码: {not_found_names}")
         
         return result
     
     def upsert_map(self, name: str, code: str, market: Optional[str] = None) -> bool:
         """更新或插入股票名称到代码的映射"""
-        logger.info(f"更新或插入股票名称到代码的映射: {name} -> {code}")
-        
         try:
             # 确定市场类型
             if not market:
@@ -290,14 +363,12 @@ class StockMapService:
                         },
                         upsert=True
                     )
-                    logger.info(f"映射已保存到数据库: {name} -> {code}")
                 except Exception as e:
                     logger.warning(f"⚠️ 写入数据库失败: {e}")
             
             # 无论数据库操作是否成功，都更新内存缓存
             self.name_to_code[name] = code
             self.code_to_name[code] = name
-            logger.info(f"更新缓存: {name} -> {code}")
             return True
         except Exception as e:
             logger.error(f"更新或插入股票名称到代码的映射失败: {e}")
@@ -305,8 +376,6 @@ class StockMapService:
     
     def get_all_maps(self, skip: int = 0, limit: int = 100) -> List[Dict]:
         """获取所有股票名称到代码的映射"""
-        logger.info(f"获取所有股票名称到代码的映射，跳过 {skip}，限制 {limit}")
-        
         result = []
         
         # 如果MongoDB可用，从数据库获取
@@ -323,7 +392,6 @@ class StockMapService:
                 result = []
         else:
             # 如果MongoDB不可用，从内存缓存获取
-            logger.info("MongoDB不可用，从内存缓存获取映射")
             count = 0
             for name, code in self.name_to_code.items():
                 if count >= skip and len(result) < limit:
@@ -338,10 +406,8 @@ class StockMapService:
     
     def get_name_by_code(self, code: str) -> Optional[str]:
         """根据股票代码获取股票名称"""
-        logger.info(f"根据股票代码获取股票名称: {code}")
         # 先从缓存查询
         if code in self.code_to_name:
-            logger.info(f"从缓存获取股票名称: {code} -> {self.code_to_name[code]}")
             return self.code_to_name[code]
         
         # 如果缓存中没有，且MongoDB可用，从数据库查询
@@ -373,7 +439,6 @@ class StockMapService:
     
     def get_a_stock_names(self) -> List[str]:
         """获取A股上市公司名称列表"""
-        logger.info("获取A股上市公司名称列表")
         names = []
         
         # 从namecode.csv文件中获取所有名称
@@ -394,11 +459,8 @@ class StockMapService:
     
     def _get_stock_code_from_api(self, name: str) -> Optional[str]:
         """通过API查询股票代码"""
-        logger.info(f"通过API查询股票代码: {name}")
-        
         # 1. 首先尝试使用手动映射（优先使用，避免频繁API调用）
         manual_mappings = {
-            # 用户提供的股票映射
             "骏亚科技": "603386",
             "安记食品": "603696",
             "国机重装": "601399",
@@ -484,15 +546,15 @@ class StockMapService:
             "舒华体育": "605299",
             "特发信息": "000070",
             "会畅科技": "300578",
+            "北投科技": "000786",
+            "五粮液": "000858",
+            "万科A": "000002",
         }
         
         if name in manual_mappings:
-            logger.info(f"使用手动映射: {name} -> {manual_mappings[name]}")
             return manual_mappings[name]
         
-        # 2. 百度搜索可能很慢，暂时禁用，优先使用本地缓存和手动映射
-        # 如果确实需要，可以考虑使用更快的API或服务
-        logger.warning(f"手动映射中未找到股票代码: {name}，百度搜索已禁用")
+        logger.warning(f"手动映射中未找到股票代码: {name}")
         return None
     
     def supplement_stock_mappings(self) -> Dict[str, int]:
@@ -544,7 +606,6 @@ class StockMapService:
                                 "created_at": datetime.utcnow()
                             }
                             self.collection.insert_one(map_data)
-                            logger.info(f"补充映射到数据库: {name} -> {code}")
                         except Exception as e:
                             logger.warning(f"⚠️ 插入数据库失败: {e}")
                     
@@ -552,7 +613,6 @@ class StockMapService:
                     self.name_to_code[name] = code
                     self.code_to_name[code] = name
                     supplemented += 1
-                    logger.info(f"补充映射: {name} -> {code}")
         
         logger.info(f"股票名称代码映射补充完成，共处理 {total} 个名称，缺失 {missing} 个，补充 {supplemented} 个")
         return {
@@ -563,8 +623,6 @@ class StockMapService:
     
     def clear_mappings(self) -> bool:
         """清空所有股票名称和代码映射"""
-        logger.info("开始清空所有股票名称和代码映射")
-        
         try:
             # 如果MongoDB可用，清空数据库
             if self.mongodb_available and self.collection is not None:
@@ -611,7 +669,8 @@ class StockMapService:
     
     def close(self):
         """关闭MongoDB连接"""
-        self.client.close()
+        if self.client:
+            self.client.close()
 
 # 创建单例实例
 stock_map_service = StockMapService()

@@ -328,6 +328,13 @@ class CrawlerService:
             
         start_date = self._get_recent_workdays(3)
         
+        # 导入ST过滤服务（延迟导入避免循环依赖）
+        from app.services.st_filter_service import st_filter_service
+        
+        # 统计变量
+        total_parsed = 0
+        st_filtered_during_parse = 0
+        
         for row in rows[1:]:
             cols = row.find_all('td')
             if len(cols) < 11:
@@ -340,6 +347,14 @@ class CrawlerService:
                 
                 if not stock_name or not user_name or not time_str:
                     continue
+                    
+                # 【前置过滤】在解析阶段就过滤ST股票（第一步过滤）
+                if st_filter_service.is_st_stock_by_name(stock_name):
+                    st_filtered_during_parse += 1
+                    logger.debug(f"🔴 [前置过滤] ST股票被排除: {stock_name}")
+                    continue
+                    
+                total_parsed += 1
                     
                 # Date parsing logic
                 try:
@@ -380,6 +395,9 @@ class CrawlerService:
             except Exception as e:
                 logger.warning(f"Error parsing row: {e}")
                 continue
+        
+        if st_filtered_during_parse > 0:
+            logger.info(f"🔍 解析阶段共过滤 {st_filtered_during_parse} 只ST股票")
                 
         return data_list
 
@@ -388,11 +406,22 @@ class CrawlerService:
         if not data_list:
             return 0
             
+        # 导入ST过滤服务（延迟导入避免循环依赖）
+        from app.services.st_filter_service import st_filter_service
+        
+        # 【二次校验】检查是否存在遗漏的ST股票（第二步过滤）
+        validation_result = st_filter_service.filter_st_stocks(data_list)
+        filtered_data = validation_result['filtered']
+        removed_count = validation_result['removed_count']
+        
+        if removed_count > 0:
+            logger.info(f"🔍 [二次校验] 发现并过滤 {removed_count} 只遗漏的ST股票")
+        
         count = 0
         # Import here to avoid circular import
         from app.services.stock_map_service import stock_map_service
         
-        for item in data_list:
+        for item in filtered_data:
             try:
                 # Add timestamp
                 item['crawled_at'] = datetime.utcnow()
@@ -401,6 +430,18 @@ class CrawlerService:
                 if 'stock_name' in item:
                     stock_code = stock_map_service.get_code_by_name(item['stock_name'])
                     item['stock_code'] = stock_code
+                    
+                    # 【最终过滤】在存储前再次检查ST状态（第三步过滤）
+                    if st_filter_service.is_st_stock_by_code(stock_code):
+                        logger.warning(f"🔴 [最终过滤] 通过股票代码检测到ST股票: {item['stock_name']} ({stock_code})")
+                        st_filter_service.log_filter([{
+                            "stock_name": item['stock_name'],
+                            "stock_code": stock_code,
+                            "reason": "最终过滤-代码检测",
+                            "filter_time": datetime.now(),
+                            "original_data": item
+                        }])
+                        continue
                 
                 # Upsert based on unique keys
                 result = self.collection.update_one(
@@ -544,7 +585,7 @@ class CrawlerService:
         
         return users
 
-    def get_data(self, page=1, page_size=20, user_name=None, stock_name=None, min_success_rate=None, reason=None, start_date=None, end_date=None):
+    def get_data(self, page=1, page_size=20, user_name=None, stock_name=None, stock_code=None, min_success_rate=None, reason=None, start_date=None, end_date=None):
         """Retrieve data for API with filtering."""
         # Build query filter
         query = {}
@@ -556,6 +597,10 @@ class CrawlerService:
         # Filter by stock_name
         if stock_name:
             query['stock_name'] = {'$regex': stock_name, '$options': 'i'}
+        
+        # Filter by stock_code
+        if stock_code:
+            query['stock_code'] = {'$regex': stock_code, '$options': 'i'}
         
         # Filter by reason
         if reason:
@@ -769,6 +814,106 @@ class CrawlerService:
                         d['success_rate'] = "0.0%"
             
             return data, total
+
+    def get_stock_summary(self, stock_name=None, stock_code=None):
+        """Get summary statistics for a specific stock."""
+        query = {}
+        
+        if stock_name:
+            query['stock_name'] = {'$regex': stock_name, '$options': 'i'}
+        if stock_code:
+            query['stock_code'] = {'$regex': stock_code, '$options': 'i'}
+        
+        # Aggregation pipeline for summary
+        pipeline = [
+            {'$match': query},
+            {
+                '$group': {
+                    '_id': None,
+                    'total_records': {'$sum': 1},
+                    'avg_success_rate': {
+                        '$avg': {
+                            '$toDouble': {'$replaceOne': {'input': '$success_rate', 'find': '%', 'replacement': ''}}
+                        }
+                    },
+                    'min_time': {'$min': '$time'},
+                    'max_time': {'$max': '$time'},
+                    'unique_users': {'$addToSet': '$user_name'}
+                }
+            }
+        ]
+        
+        cursor = self.collection.aggregate(pipeline)
+        result = list(cursor)
+        
+        if result:
+            summary = result[0]
+            return {
+                'stock_name': stock_name,
+                'stock_code': stock_code,
+                'total_records': summary.get('total_records', 0),
+                'avg_success_rate': round(summary.get('avg_success_rate', 0), 2),
+                'unique_users_count': len(summary.get('unique_users', [])),
+                'date_range': {
+                    'start': summary.get('min_time'),
+                    'end': summary.get('max_time')
+                }
+            }
+        else:
+            return {
+                'stock_name': stock_name,
+                'stock_code': stock_code,
+                'total_records': 0,
+                'avg_success_rate': 0,
+                'unique_users_count': 0,
+                'date_range': {
+                    'start': None,
+                    'end': None
+                }
+            }
+    
+    def get_unique_stocks(self, keyword=None, limit=50):
+        """Get unique stock list from crawler data."""
+        pipeline = []
+        
+        if keyword:
+            pipeline.append({
+                '$match': {
+                    '$or': [
+                        {'stock_name': {'$regex': keyword, '$options': 'i'}},
+                        {'stock_code': {'$regex': keyword, '$options': 'i'}}
+                    ]
+                }
+            })
+        
+        pipeline.extend([
+            {
+                '$group': {
+                    '_id': {
+                        'stock_name': '$stock_name',
+                        'stock_code': '$stock_code'
+                    },
+                    'count': {'$sum': 1},
+                    'latest_time': {'$max': '$time'}
+                }
+            },
+            {'$sort': {'count': DESCENDING}},
+            {'$limit': limit},
+            {
+                '$project': {
+                    '_id': 0,
+                    'stock_name': '$_id.stock_name',
+                    'stock_code': '$_id.stock_code',
+                    'record_count': '$count',
+                    'latest_time': '$latest_time'
+                }
+            }
+        ])
+        
+        cursor = self.collection.aggregate(pipeline)
+        stocks = list(cursor)
+        
+        return stocks
 
     def crawl_pages(self, start_page, end_page, force=False):
         """Crawl pages with enhanced thread stability."""

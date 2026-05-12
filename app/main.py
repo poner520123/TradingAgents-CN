@@ -54,6 +54,7 @@ from app.routers.model_capabilities import router as model_capabilities_router
 from app.routers.cache import router as cache_router
 from app.routers.logs import router as logs_router
 from app.routers.crawler import router as crawler_router
+from app.routers.st_filter import router as st_filter_router
 from app.routers.sync import router as sync_router
 from app.routers.multi_source_sync import router as multi_source_sync_router
 from app.routers.stocks import router as stocks_router
@@ -933,6 +934,9 @@ app.include_router(internal_messages_router, tags=["internal-messages"])
 
 # 爬虫路由
 app.include_router(crawler_router, prefix="/api", tags=["crawler"])
+
+# ST股票过滤路由
+app.include_router(st_filter_router, prefix="/api", tags=["st-filter"])
 
 # astock路由
 app.include_router(astock_router, prefix="/api", tags=["astock"])

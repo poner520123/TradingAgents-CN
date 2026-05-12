@@ -89,21 +89,7 @@
             <el-tag :type="getSuccessRateType(scope.row.success_rate)">{{ scope.row.success_rate }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="concepts" label="题材概念" min-width="200">
-          <template #default="scope">
-            <div class="concepts-wrapper">
-              <el-tag 
-                v-for="(concept, index) in parseConcepts(scope.row.concepts)" 
-                :key="index" 
-                size="small" 
-                class="mr-1 mb-1"
-                effect="plain"
-              >
-                {{ concept }}
-              </el-tag>
-            </div>
-          </template>
-        </el-table-column>
+        
         <el-table-column prop="reason" label="伏击理由" min-width="200" show-overflow-tooltip />
         <el-table-column prop="time" label="发布时间" width="160" sortable />
         <el-table-column prop="price" label="伏击价" width="100" />
@@ -351,11 +337,6 @@ const addToFavorites = async (row: CrawlerData) => {
   }
 }
 
-const parseConcepts = (conceptsStr: string) => {
-  if (!conceptsStr) return []
-  return conceptsStr.split(',').filter(c => c && c.trim())
-}
-
 const getSuccessRateType = (rate: string) => {
   if (!rate) return 'info'
   const val = parseFloat(rate.replace('%', ''))
@@ -509,10 +490,6 @@ onMounted(async () => {
 }
 .mb-1 {
   margin-bottom: 4px;
-}
-.concepts-wrapper {
-  display: flex;
-  flex-wrap: wrap;
 }
 .pagination-container {
   margin-top: 20px;
