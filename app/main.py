@@ -55,6 +55,7 @@ from app.routers.cache import router as cache_router
 from app.routers.logs import router as logs_router
 from app.routers.crawler import router as crawler_router
 from app.routers.st_filter import router as st_filter_router
+from app.routers.quotes import router as quotes_router
 from app.routers.sync import router as sync_router
 from app.routers.multi_source_sync import router as multi_source_sync_router
 from app.routers.stocks import router as stocks_router
@@ -341,6 +342,15 @@ async def lifespan(app: FastAPI):
                 pass
         except Exception as e:
             logging.getLogger("webapi").warning(f"Failed to apply dynamic settings: {e}")
+        
+        # 启动涨幅缓存后台定时刷新任务
+        try:
+            from app.services.quotes_service import get_quotes_service
+            quotes_service = get_quotes_service()
+            await quotes_service.start_auto_refresh()
+            logger.info("✅ 涨幅缓存后台定时刷新任务已启动")
+        except Exception as e:
+            logger.error(f"❌ 启动涨幅缓存刷新任务失败: {e}")
         
         # 显示配置摘要
         await _print_config_summary(logger)
@@ -937,6 +947,9 @@ app.include_router(crawler_router, prefix="/api", tags=["crawler"])
 
 # ST股票过滤路由
 app.include_router(st_filter_router, prefix="/api", tags=["st-filter"])
+
+# 行情接口路由
+app.include_router(quotes_router, prefix="/api", tags=["quotes"])
 
 # astock路由
 app.include_router(astock_router, prefix="/api", tags=["astock"])

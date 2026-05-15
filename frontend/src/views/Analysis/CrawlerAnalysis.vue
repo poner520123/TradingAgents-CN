@@ -48,21 +48,14 @@
               style="width: 120px;"
             />
           </el-form-item>
-          <el-form-item label="伏击理由">
-            <el-input v-model="filterForm.reason" placeholder="请输入伏击理由" clearable />
+          <el-form-item label="名称">
+            <el-input v-model="filterForm.stock_name" placeholder="请输入股票名称（模糊查询）" clearable />
           </el-form-item>
-          <el-form-item label="日期范围">
-            <el-date-picker
-              v-model="filterForm.date_range"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              default-time="00:00:00"
-              style="width: 240px;"
-            />
+          <el-form-item label="代码">
+            <el-input v-model="filterForm.stock_code" placeholder="请输入股票代码（模糊查询）" clearable />
+          </el-form-item>
+          <el-form-item label="理由">
+            <el-input v-model="filterForm.reason" placeholder="请输入伏击理由" clearable />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleFilter">筛选</el-button>
@@ -93,7 +86,6 @@
         <el-table-column prop="reason" label="伏击理由" min-width="200" show-overflow-tooltip />
         <el-table-column prop="time" label="发布时间" width="160" sortable />
         <el-table-column prop="price" label="伏击价" width="100" />
-
         
         <el-table-column label="AI分析" width="120" fixed="right">
           <template #default="scope">
@@ -172,8 +164,9 @@ const total = ref(0)
 const filterForm = ref({
   user_name: '',
   min_success_rate: null,
-  reason: '',
-  date_range: null as [Date, Date] | null
+  stock_name: '',
+  stock_code: '',
+  reason: ''
 })
 
 // 爬虫状态管理
@@ -239,13 +232,9 @@ const fetchData = async () => {
       page_size: pageSize.value,
       user_name: filterForm.value.user_name,
       min_success_rate: filterForm.value.min_success_rate,
+      stock_name: filterForm.value.stock_name,
+      stock_code: filterForm.value.stock_code,
       reason: filterForm.value.reason
-    }
-
-    // 添加日期范围筛选
-    if (filterForm.value.date_range) {
-      params.start_date = filterForm.value.date_range[0].toISOString().split('T')[0]
-      params.end_date = filterForm.value.date_range[1].toISOString().split('T')[0]
     }
 
     const res = await getCrawlerData(params)
@@ -622,6 +611,23 @@ onMounted(async () => {
       }
     }
   }
+}
+
+/* 涨幅样式 */
+.pct-change {
+  font-weight: bold;
+}
+.pct-change.positive {
+  color: #f56c6c;
+}
+.pct-change.negative {
+  color: #67c23a;
+}
+.pct-change.zero {
+  color: #909399;
+}
+.text-muted {
+  color: #909399;
 }
 
 @keyframes rotate {
