@@ -34,14 +34,28 @@ from app.services.redis_progress_tracker import RedisProgressTracker, get_progre
 from app.services.progress_log_handler import register_analysis_tracker, unregister_analysis_tracker
 
 # 股票基础信息获取（用于补充显示名称）
-try:
-    from tradingagents.dataflows.data_source_manager import get_data_source_manager
-    _data_source_manager = get_data_source_manager()
-    def _get_stock_info_safe(stock_code: str):
-        """获取股票基础信息的安全封装"""
+#
+# 数据源管理器改为**惰性创建**：其构造函数会探测数据库可用性并初始化统一缓存，
+# 若在模块导入阶段创建，仅 import 本模块就要等待 MongoDB 连接超时（本机无
+# MongoDB 时约 30 秒）。这里推迟到真正需要查股票名称时才创建。
+_data_source_manager = None
+
+
+def _get_stock_info_safe(stock_code: str):
+    """获取股票基础信息的安全封装（数据源管理器惰性创建）"""
+    global _data_source_manager
+    if _data_source_manager is None:
+        try:
+            from tradingagents.dataflows.data_source_manager import get_data_source_manager
+            _data_source_manager = get_data_source_manager()
+        except Exception as exc:
+            logger.warning(f"数据源管理器初始化失败，股票基础信息不可用: {exc}")
+            return None
+    try:
         return _data_source_manager.get_stock_basic_info(stock_code)
-except Exception:
-    _get_stock_info_safe = None
+    except Exception as exc:
+        logger.warning(f"获取股票基础信息失败 {stock_code}: {exc}")
+        return None
 
 # 设置日志
 logger = logging.getLogger("app.services.simple_analysis_service")

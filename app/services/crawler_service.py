@@ -31,10 +31,11 @@ class CrawlerService:
     def __init__(self):
         # Initialize sync MongoDB connection using global sync client
         from app.core.database import get_mongo_db_sync
+        # 数据库初始化推迟到首次使用（避免模块导入阶段的网络 I/O）
+        self._db_initialized = False
         self.db = get_mongo_db_sync()
         self.collection = self.db.crawler_data
         
-        self._init_db()
         self._init_session()
         self._init_concepts()
         
@@ -49,6 +50,10 @@ class CrawlerService:
     
     def _init_db(self):
         """Initialize database indexes."""
+        # 惰性初始化守卫：只在首次访问数据库时执行一次
+        if getattr(self, "_db_initialized", False):
+            return
+        self._db_initialized = True
         try:
             # Create unique index for deduping
             self.collection.create_index([
@@ -314,7 +319,8 @@ class CrawlerService:
         
         for table in soup.find_all('table'):
             header_row = table.find('tr')
-            if header_row and "伏击人" in header_row.get_text():
+            if header_row and ("伏击人" in header_row.get_text()
+                               or "发现人" in header_row.get_text()):
                 target_table = table
                 break
         
@@ -403,6 +409,7 @@ class CrawlerService:
 
     def save_data(self, data_list):
         """Save data to MongoDB with upsert."""
+        self._init_db()
         if not data_list:
             return 0
             
@@ -463,6 +470,7 @@ class CrawlerService:
     
     def update_historical_stock_codes(self):
         """更新历史爬虫数据中的股票代码"""
+        self._init_db()
         logger.info("开始更新历史爬虫数据中的股票代码")
         
         # Import here to avoid circular import
@@ -520,6 +528,7 @@ class CrawlerService:
 
     def get_top_users_by_success_rate(self, limit=30):
         """Get top users by success rate."""
+        self._init_db()
         from datetime import datetime, timedelta
         
         # Calculate 1 month ago
@@ -587,6 +596,7 @@ class CrawlerService:
 
     def get_data(self, page=1, page_size=20, user_name=None, stock_name=None, stock_code=None, min_success_rate=None, reason=None, start_date=None, end_date=None):
         """Retrieve data for API with filtering."""
+        self._init_db()
         # Build query filter
         query = {}
         
@@ -817,6 +827,7 @@ class CrawlerService:
 
     def get_stock_summary(self, stock_name=None, stock_code=None):
         """Get summary statistics for a specific stock."""
+        self._init_db()
         query = {}
         
         if stock_name:
@@ -874,6 +885,7 @@ class CrawlerService:
     
     def get_unique_stocks(self, keyword=None, limit=50):
         """Get unique stock list from crawler data."""
+        self._init_db()
         pipeline = []
         
         if keyword:
@@ -916,220 +928,64 @@ class CrawlerService:
         return stocks
 
     def crawl_pages(self, start_page, end_page, force=False):
-        """Crawl pages with enhanced thread stability."""
-        # 检查是否已经有爬虫任务在执行
+        """Crawl pages with enhanced thread stability.
+
+        Crawls pages in [start_page, end_page] **once** without auto-expansion.
+        Caller controls how many pages to fetch.  Duplicate records are
+        skipped by MongoDB upsert on (user_name, stock_name, time).
+        """
         if self.is_running and not force:
             logger.info("爬虫任务已经在执行中，跳过本次执行")
             return 0
-        
-        # 设置执行状态为运行中
+
         self.is_running = True
-        
+
         try:
-            # Logic similar to original but with enhanced error handling and smart page adjustment
-            from app.routers.websocket_notifications import send_notification_via_websocket
-            import asyncio
-            
-            # 记录已获取的日期范围
-            collected_dates = set()
-            # 初始爬取页面范围
-            current_start_page = start_page
-            current_end_page = end_page
-            # 标记是否已经覆盖了最近3个工作日
-            has_covered_recent_workdays = False
-            # 最大爬取页面数，防止无限循环，确保在5分钟内完成
-            MAX_PAGES = 20
-            
             # 每次执行都重新计数，而不是累积计数
-            # 这样可以确保每次定时任务都能正常执行
             self.__class__.total_pages_crawled = 0
             self.__class__.total_saved = 0
-            
-            # 获取最近3个工作日的日期集合
-            recent_workdays = set()
-            today = datetime.now().date()
-            workdays = 0
-            current_date = today
-            while workdays < 3:
-                # 使用改进的交易日判断，考虑节假日
-                is_weekday = current_date.weekday() < 5  # 0-4 表示周一到周五
-                # 检查是否是节假日（使用_get_recent_workdays中的节假日列表）
-                holidays = {
-                    (2025, 1, 1), (2025, 1, 2), (2025, 1, 3),
-                    (2025, 1, 28), (2025, 1, 29), (2025, 1, 30), (2025, 1, 31), (2025, 2, 1), (2025, 2, 2),
-                    (2025, 4, 28), (2025, 4, 29), (2025, 4, 30), (2025, 5, 1), (2025, 5, 2),
-                    (2025, 5, 27), (2025, 5, 28), (2025, 5, 29),
-                    (2025, 9, 29), (2025, 9, 30),
-                    (2025, 10, 1), (2025, 10, 2), (2025, 10, 3), (2025, 10, 4), (2025, 10, 5), (2025, 10, 6), (2025, 10, 7)
-                }
-                is_holiday = (current_date.year, current_date.month, current_date.day) in holidays
-                
-                if is_weekday and not is_holiday:
-                    recent_workdays.add(current_date)
-                    workdays += 1
-                current_date -= timedelta(days=1)
-            
-            logger.info(f"🎯 需要覆盖的最近3个工作日: {sorted(recent_workdays)}")
-            
-            while not has_covered_recent_workdays and self.__class__.total_pages_crawled < MAX_PAGES:
-                logger.info(f"🔍 开始爬取页面 {current_start_page}-{current_end_page}，目标覆盖最近3个工作日")
-                
-                for page in range(current_start_page, current_end_page + 1):
-                    if self.__class__.total_pages_crawled >= MAX_PAGES:
-                        logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，停止爬取")
-                        break
-                    
-                    self.__class__.total_pages_crawled += 1
-                    logger.debug(f"正在爬取第 {page} 页...")
-                    
-                    html = self.fetch_page(page)
-                    if html:
-                        try:
-                            data = self.parse_html(html)
-                            if data:
-                                try:
-                                    # 保存数据并获取具体的股票信息
-                                    saved = self.save_data(data)
-                                    self.__class__.total_saved += saved
-                                    
-                                    # 记录保存数据进度，不再使用异步通知
-                                    from app.services.stock_map_service import stock_map_service
-                                    
-                                    # 处理最新的20条数据
-                                    recent_stocks = data[:20]  # 只处理前20条
-                                    
-                                    # 仅在调试模式下记录详细的股票信息
-                                    logger.debug(f"第 {page} 页: 成功保存 {saved} 条新数据")
-                                    
-                                    # 仅在调试模式下记录前5条股票信息，避免日志过多
-                                    if logger.isEnabledFor(logging.DEBUG):
-                                        for item in recent_stocks[:5]:  # 只记录前5条
-                                            stock_name = item['stock_name']
-                                            stock_code = stock_map_service.get_code_by_name(stock_name)
-                                            logger.debug(f"已爬取: {stock_name} ({stock_code}) - {item['reason']}")
-                                    if len(recent_stocks) > 5:
-                                        logger.debug(f"... 等共 {len(recent_stocks)} 条数据")
-                                    
-                                    # 收集已获取数据的日期
-                                    for item in data:
-                                        time_str = item['time']
-                                        try:
-                                            ts = time_str.strip()
-                                            if '-' in ts:
-                                                fmt = '%Y-%m-%d %H:%M' if ':' in ts else '%Y-%m-%d'
-                                                row_date = datetime.strptime(ts, fmt)
-                                                # 只记录日期部分
-                                                collected_dates.add(row_date.date())
-                                            elif '/' in ts:
-                                                fmt = '%Y/%m/%d %H:%M' if ':' in ts else '%Y/%m/%d'
-                                                row_date = datetime.strptime(ts, fmt)
-                                                # 只记录日期部分
-                                                collected_dates.add(row_date.date())
-                                            else:
-                                                continue
-                                        except ValueError:
-                                            continue
-                                    
-                                    # 每次获取新数据后，立即检查是否已经覆盖了最近3个工作日
-                                    if recent_workdays.issubset(collected_dates):
-                                        has_covered_recent_workdays = True
-                                        logger.info("✅ 已成功覆盖最近3个工作日的数据，提前结束爬取")
-                                        break
-                                    
-                                    # 设置成功延迟
-                                    delay = get_random_delay("success")
-                                except Exception as e:
-                                    logger.error(f"Page {page}: Error saving data - {type(e).__name__}: {str(e)}")
-                                    delay = get_random_delay("failure")
-                                    
-                                    # 发送保存失败通知
-                                    # 保存失败已通过日志记录，无需额外通知
-                            else:
-                                logger.warning(f"Page {page}: No data or parsing failed")
-                                delay = get_random_delay("failure")
-                            
-                            # Add random pause if needed
-                            if should_insert_random_pause():
-                                random_pause = get_random_pause()
-                                logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
-                                time.sleep(random_pause)
-                            
-                            # Add base delay
-                            logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
-                            time.sleep(delay)
-                        except Exception as e:
-                            logger.error(f"Page {page}: Error parsing HTML - {type(e).__name__}: {str(e)}")
-                            delay = get_random_delay("failure")
-                            
-                            # Add random pause if needed
-                            if should_insert_random_pause():
-                                random_pause = get_random_pause()
-                                logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
-                                time.sleep(random_pause)
-                            
-                            # Add base delay
-                            logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
-                            time.sleep(delay)
-                    else:
-                        logger.error(f"Page {page}: Failed to fetch")
-                        delay = get_random_delay("failure")
-                        
-                        # 发送获取页面失败通知
-                        # 获取页面失败已通过日志记录，无需额外通知
-                        
-                        # Add random pause if needed
-                        if should_insert_random_pause():
-                            random_pause = get_random_pause()
-                            logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
-                            time.sleep(random_pause)
-                        
-                        # Add base delay
-                        logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
-                        time.sleep(delay)
-                        continue
-                
-                # 如果已经覆盖了最近3个工作日，跳出循环
-                if recent_workdays.issubset(collected_dates):
-                    has_covered_recent_workdays = True
-                    logger.info("✅ 已成功覆盖最近3个工作日的数据")
-                    break
-                
-                # 检查是否已经爬取了足够多的页面但仍未覆盖所有最近3个工作日
-                if self.__class__.total_pages_crawled >= MAX_PAGES:
-                    logger.warning(f"⚠️ 已达到最大爬取页面数 {MAX_PAGES}，但仍未覆盖所有最近3个工作日")
-                    break
-                
-                # 智能调整下一轮爬取的页面范围
-                # 如果当前轮次没有获取到新数据，增加页面步长
-                pages_in_current_round = current_end_page - current_start_page + 1
-                if len(collected_dates) == 0:
-                    # 没有获取到任何数据，大幅增加爬取页面数
-                    current_start_page = current_end_page + 1
-                    current_end_page = current_start_page + pages_in_current_round * 2
-                    logger.info(f"⚠️ 未获取到任何数据，大幅增加爬取页面数。新的爬取范围: {current_start_page}-{current_end_page}")
+
+            logger.info(f"🔍 开始爬取页面 {start_page}-{end_page}（固定范围，不自动扩页）")
+
+            for page in range(start_page, end_page + 1):
+                self.__class__.total_pages_crawled += 1
+                logger.debug(f"正在爬取第 {page} 页...")
+
+                html = self.fetch_page(page)
+                if not html:
+                    logger.warning(f"Page {page}: Failed to fetch")
+                    continue
+
+                data = self.parse_html(html)
+                if not data:
+                    logger.warning(f"Page {page}: No data or parsing failed")
+                    delay = get_random_delay("failure")
                 else:
-                    # 获取到了部分数据，适当增加爬取页面数
-                    current_start_page = current_end_page + 1
-                    current_end_page = current_start_page + pages_in_current_round
-                    logger.info(f"⚠️ 已获取到部分数据，适当增加爬取页面数。新的爬取范围: {current_start_page}-{current_end_page}")
-                
-                logger.debug(f"📅 最终收集的日期: {sorted(collected_dates)}")
-            
-            if recent_workdays.issubset(collected_dates):
-                logger.info("✅ 成功覆盖所有最近3个工作日的数据")
-            else:
-                missing_days = recent_workdays - collected_dates
-                logger.warning(f"⚠️ 未能覆盖所有最近3个工作日的数据，缺少: {sorted(missing_days)}")
-                
-            logger.info(f"✅ Crawl completed: Saved {self.__class__.total_saved} new records from {self.__class__.total_pages_crawled} pages")
-            
-            # 发送爬取完成通知
-            # 爬取完成已通过日志记录，无需额外通知
-            
+                    try:
+                        saved = self.save_data(data)
+                        self.__class__.total_saved += saved
+                        logger.debug(f"Page {page}: 成功保存 {saved} 条新数据 (总 {len(data)} 条)")
+                        delay = get_random_delay("success")
+                    except Exception as e:
+                        logger.error(f"Page {page}: Error saving data: {e}")
+                        delay = get_random_delay("failure")
+
+                # Add random pause if needed
+                if should_insert_random_pause():
+                    random_pause = get_random_pause()
+                    logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
+                    time.sleep(random_pause)
+
+                logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
+                time.sleep(delay)
+
+            logger.info(
+                f"✅ Crawl completed: Saved {self.__class__.total_saved} new records "
+                f"from {self.__class__.total_pages_crawled} pages"
+            )
             return self.__class__.total_saved
-        
+
         finally:
-            # 无论任务是否成功完成，都将执行状态设置为未运行
             self.is_running = False
             logger.info("爬虫任务执行完成，释放执行锁")
 

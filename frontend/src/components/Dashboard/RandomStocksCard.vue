@@ -32,13 +32,13 @@
         v-for="stock in randomStocks"
         :key="stock.stock_code || stock.stock_name"
         class="stock-item"
-        :class="{ 'limit-up': stock.limit_up === '1' || parseFloat(stock.increase.replace('%', '')) >= 9.0 }"
+        :class="{ 'limit-up': isLimitUp(stock) }"
         @click="goToStockAnalysis(stock)"
       >
         <div class="stock-info">
           <div class="stock-name">
             {{ stock.stock_name }}
-            <span v-if="stock.limit_up === '1' || parseFloat(stock.increase.replace('%', '')) >= 9.0" class="limit-up-badge">
+            <span v-if="isLimitUp(stock)" class="limit-up-badge">
               <el-icon><Top /></el-icon>
               涨停
             </span>
@@ -46,8 +46,8 @@
           <div class="stock-code">{{ stock.stock_code || '未知' }}</div>
         </div>
         <div class="stock-details">
-          <div class="stock-increase" :class="{ 'increase-up': parseFloat(stock.increase.replace('%', '')) > 0 }">
-            {{ stock.increase }}
+          <div class="stock-increase" :class="{ 'increase-up': isUp(stock) }">
+            {{ displayIncrease(stock.increase) }}
           </div>
           <div class="stock-reason">{{ stock.reason || '无' }}</div>
         </div>
@@ -110,11 +110,39 @@ const getRandomElements = <T>(arr: T[], count: number): T[] => {
   return shuffled.slice(0, count)
 }
 
+// 解析涨幅：站点填报期该字段常为空，返回 null 表示"涨幅未知"
+const parseIncrease = (increase?: string): number | null => {
+  const raw = (increase ?? '').toString().replace('%', '').trim()
+  if (!raw) return null
+  const value = parseFloat(raw)
+  return Number.isNaN(value) ? null : value
+}
+
+// 是否涨停
+const isLimitUp = (stock: CrawlerData): boolean => {
+  return stock.limit_up === '1' || (parseIncrease(stock.increase) ?? 0) >= 9.0
+}
+
+// 是否上涨
+const isUp = (stock: CrawlerData): boolean => {
+  return (parseIncrease(stock.increase) ?? 0) > 0
+}
+
+// 涨幅展示：未知时显示占位符，避免出现空白
+const displayIncrease = (increase?: string): string => {
+  return parseIncrease(increase) === null ? '--' : String(increase)
+}
+
 // 判断是否突破压力位
 const isBreakthrough = (stock: CrawlerData): boolean => {
   // 获取涨幅百分比（去除%号）
-  const increase = parseFloat(stock.increase.replace('%', ''))
-  
+  const increase = parseIncrease(stock.increase)
+
+  // 涨幅未知时不做过滤，避免整块卡片为空
+  if (increase === null) {
+    return true
+  }
+
   // 条件1: 涨幅在2%-8%之间，处于突破阶段但未涨停
   if (increase < 2 || increase > 8) {
     return false
@@ -131,11 +159,11 @@ const isBreakthrough = (stock: CrawlerData): boolean => {
 const calculateLimitUpScore = (stock: CrawlerData): number => {
   let score = 0
   
-  // 获取涨幅百分比
-  const increase = parseFloat(stock.increase.replace('%', ''))
+  // 获取涨幅百分比（未知时为 null）
+  const increase = parseIncrease(stock.increase)
   
   // 涨幅越大，涨停概率越高（2%-8%之间）
-  if (increase >= 2 && increase <= 8) {
+  if (increase !== null && increase >= 2 && increase <= 8) {
     score += increase * 10
   }
   

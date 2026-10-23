@@ -1,4 +1,18 @@
 // 分析状态枚举
+//
+// ⚠️ 单一真源说明
+// ---------------------------------------------------------------------------
+// AnalysisResult / SingleAnalysisRequest 此前在本文件与 `@/api/analysis` 中
+// **重复定义且结构分叉**（api 版含 current_price / technical_analysis 等实际
+// 返回字段，types 版缺失；SingleAnalysisRequest 的 parameters 字段集也不同）。
+// 现统一以 `@/api/analysis`（真正描述接口载荷）为唯一真源：
+//   - `import type` 在编译期被完全擦除，不产生运行时依赖；
+//   - 再导出保证 `from '@/types/analysis'` 的导入路径继续可用；
+//   - 两侧类型从此永远一致。
+import type { AnalysisResult, SingleAnalysisRequest } from '@/api/analysis'
+
+export type { AnalysisResult, SingleAnalysisRequest }
+
 export enum AnalysisStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
@@ -29,19 +43,7 @@ export interface AnalysisParameters {
 }
 
 // 分析结果
-export interface AnalysisResult {
-  analysis_id: string
-  summary?: string
-  recommendation?: string
-  confidence_score?: number
-  risk_level?: string
-  key_points: string[]
-  detailed_analysis?: Record<string, any>
-  charts: string[]
-  tokens_used: number
-  execution_time: number
-  error_message?: string
-}
+// ⚠️ 单一真源见文件顶部说明：统一由 `@/api/analysis` 导出。
 
 // 分析任务
 export interface AnalysisTask {
@@ -143,11 +145,7 @@ export interface StockInfo {
 }
 
 // 单股分析请求
-export interface SingleAnalysisRequest {
-  symbol?: string  // 主字段：6位股票代码
-  stock_code?: string  // 兼容字段（已废弃）
-  parameters?: AnalysisParameters
-}
+// 单一真源见文件顶部说明：统一由 `@/api/analysis` 导出。
 
 // 批量分析请求
 export interface BatchAnalysisRequest {

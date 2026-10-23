@@ -5,6 +5,7 @@
 
 import json
 import os
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
@@ -31,9 +32,24 @@ class ConfigPaths:
     verified_models_json: Path = root_config_dir / "verified_models.json"
 
 
+def _to_plain_value(value: Any) -> Any:
+    """把枚举成员转换成原始值
+
+    注意：Python 3.11+ 中 ``str(ModelRole.QUICK_ANALYSIS)`` 返回的是
+    ``"ModelRole.QUICK_ANALYSIS"`` 而不是 ``"quick_analysis"``，
+    因此这里统一使用 ``.value`` 做转换，保证写回配置文件后仍能被正确解析。
+    """
+    return value.value if isinstance(value, Enum) else value
+
+
+def _to_plain_list(values: Optional[List[Any]]) -> List[Any]:
+    """把枚举列表转换成原始值列表"""
+    return [_to_plain_value(value) for value in (values or [])]
+
+
 class UnifiedConfigManager:
     """统一配置管理器"""
-    
+
     def __init__(self):
         self.paths = ConfigPaths()
         self._cache = {}
@@ -113,7 +129,13 @@ class UnifiedConfigManager:
                     max_tokens=model.get("max_tokens", 4000),
                     temperature=model.get("temperature", 0.7),
                     enabled=model.get("enabled", True),
-                    description=f"{model.get('provider', '')} {model.get('model_name', '')}"
+                    description=f"{model.get('provider', '')} {model.get('model_name', '')}",
+                    # 模型能力分级参数（由 /api/model-capabilities/batch-init 写入）
+                    capability_level=model.get("capability_level", 2),
+                    suitable_roles=model.get("suitable_roles") or ["both"],
+                    features=model.get("features") or [],
+                    recommended_depths=model.get("recommended_depths") or ["快速", "基础", "标准"],
+                    performance_metrics=model.get("performance_metrics")
                 )
                 llm_configs.append(llm_config)
             except Exception as e:
@@ -136,7 +158,13 @@ class UnifiedConfigManager:
                 "base_url": llm_config.api_base,
                 "max_tokens": llm_config.max_tokens,
                 "temperature": llm_config.temperature,
-                "enabled": llm_config.enabled
+                "enabled": llm_config.enabled,
+                # 模型能力分级参数，保证运行时读取配置时也能拿到能力信息
+                "capability_level": llm_config.capability_level,
+                "suitable_roles": _to_plain_list(llm_config.suitable_roles),
+                "features": _to_plain_list(llm_config.features),
+                "recommended_depths": _to_plain_list(llm_config.recommended_depths),
+                "performance_metrics": llm_config.performance_metrics
             }
             
             # 查找并更新现有配置，或添加新配置
@@ -156,6 +184,42 @@ class UnifiedConfigManager:
             
         except Exception as e:
             print(f"保存LLM配置失败: {e}")
+            return False
+
+    def sync_llm_capability_to_legacy(self, llm_config: LLMConfig) -> bool:
+        """把模型能力参数同步到传统配置中已存在的条目
+
+        与 save_llm_config 的区别：
+        - 只更新能力参数字段，不会覆盖 base_url/max_tokens 等其他配置
+        - 传统配置中不存在该模型时不会新增条目，避免产生重复模型
+
+        Returns:
+            True 表示已同步；False 表示未找到对应条目或写入失败
+        """
+        try:
+            legacy_models = self.get_legacy_models()
+
+            target = None
+            for model in legacy_models:
+                if (model.get("provider") == llm_config.provider and
+                        model.get("model_name") == llm_config.model_name):
+                    target = model
+                    break
+
+            if target is None:
+                return False
+
+            target["capability_level"] = llm_config.capability_level
+            target["suitable_roles"] = _to_plain_list(llm_config.suitable_roles)
+            target["features"] = _to_plain_list(llm_config.features)
+            target["recommended_depths"] = _to_plain_list(llm_config.recommended_depths)
+            target["performance_metrics"] = llm_config.performance_metrics
+
+            self._save_json_file(self.paths.models_json, legacy_models, "models")
+            return True
+
+        except Exception as e:
+            print(f"同步模型能力参数到传统配置失败: {e}")
             return False
     
     # ==================== 系统设置管理 ====================

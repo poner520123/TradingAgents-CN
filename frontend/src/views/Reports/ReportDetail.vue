@@ -307,9 +307,11 @@ const llmConfigs = ref<LLMConfig[]>([]) // 存储所有模型配置
 // 获取模型配置列表
 const fetchLLMConfigs = async () => {
   try {
-    const response = await configApi.getSystemConfig()
-    if (response.success && response.data?.llm_configs) {
-      llmConfigs.value = response.data.llm_configs
+    // 后端 GET /api/config/system 返回的是**扁平的** SystemConfigResponse
+    // （config_name / llm_configs / default_llm ...），不是 {success, data} 信封。
+    const systemConfig = await configApi.getSystemConfig()
+    if (systemConfig?.llm_configs) {
+      llmConfigs.value = systemConfig.llm_configs
     }
   } catch (error) {
     console.error('获取模型配置失败:', error)

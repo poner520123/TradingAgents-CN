@@ -22,10 +22,11 @@ class PopularityRankingCrawler:
     def __init__(self):
         # Initialize sync MongoDB connection using global sync client
         from app.core.database import get_mongo_db_sync
+        # 数据库初始化推迟到首次使用（避免模块导入阶段的网络 I/O）
+        self._db_initialized = False
         self.db = get_mongo_db_sync()
         self.collection = self.db.popularity_ranking
         
-        self._init_db()
         self._init_session()
         
         # Session lifetime configuration
@@ -48,6 +49,10 @@ class PopularityRankingCrawler:
     
     def _init_db(self):
         """Initialize database indexes."""
+        # 惰性初始化守卫：只在首次访问数据库时执行一次
+        if getattr(self, "_db_initialized", False):
+            return
+        self._db_initialized = True
         try:
             # Create unique index for deduping
             self.collection.create_index([
@@ -552,6 +557,7 @@ class PopularityRankingCrawler:
 
     def save_data(self, data_list):
         """Save data to MongoDB with upsert."""
+        self._init_db()
         if not data_list:
             return 0
             
@@ -612,6 +618,7 @@ class PopularityRankingCrawler:
     
     def get_popularity_ranking(self, limit=50):
         """获取人气排行数据（按股票名称去重，只保留最新记录）"""
+        self._init_db()
         # 获取所有数据并按时间倒序排序
         cursor = self.collection.find().sort("crawled_at", -1)
         all_data = list(cursor)
@@ -644,6 +651,7 @@ class PopularityRankingCrawler:
     
     def check_crawl_status(self):
         """检查爬虫状态"""
+        self._init_db()
         if not self.last_crawl_time:
             return {"status": "not_started", "message": "爬虫尚未启动"}
         

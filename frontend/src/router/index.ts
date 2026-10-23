@@ -19,7 +19,7 @@ NProgress.configure({
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/dashboard'
+    redirect: '/strategy'
   },
   // 兼容文档链接：将 /paper/<name>.md 重定向到学习中心文章路由
   {
@@ -27,6 +27,28 @@ const routes: RouteRecordRaw[] = [
     name: 'PaperMdRedirect',
     redirect: (to) => `/learning/article/${to.params.name as string}`,
     meta: { title: '文档跳转', hideInMenu: true, requiresAuth: false }
+  },
+  {
+    path: '/strategy',
+    name: 'AdvancedStrategy',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '高级策略',
+      icon: 'MagicStick',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'AdvancedStrategyHome',
+        component: () => import('@/views/Strategy/AdvancedStrategy.vue'),
+        meta: {
+          title: '高级策略',
+          requiresAuth: true
+        }
+      }
+    ]
   },
   {
     path: '/dashboard',
@@ -464,9 +486,9 @@ router.beforeEach(async (to, from, next) => {
 
 
 
-  // 如果已登录且访问登录页，重定向到仪表板
+  // 如果已登录且访问登录页，重定向到高级策略（默认首页）
   if (authStore.isAuthenticated && to.name === 'Login') {
-    next('/dashboard')
+    next('/strategy')
     return
   }
 

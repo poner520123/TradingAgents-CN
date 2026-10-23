@@ -650,6 +650,161 @@ def get_reddit_company_news(
     return f"##{ticker} News Reddit, from {before} to {curr_date}:\n\n{news_str}"
 
 
+# ---------------------------------------------------------------------------
+# Reddit 情绪分析
+# ---------------------------------------------------------------------------
+# 关键词情绪词典（用于对 Reddit 帖子标题/正文做轻量情绪打分）
+_REDDIT_POSITIVE_KEYWORDS = (
+    "bullish", "buy", "upgrade", "surge", "surges", "surged", "gain", "gains",
+    "beat", "beats", "record", "strong", "growth", "profit", "outperform",
+    "soar", "soars", "rally", "rallies", "optimistic", "opportunity", "rebound",
+    "recovery", "breakout", "momentum",
+)
+
+_REDDIT_NEGATIVE_KEYWORDS = (
+    "bearish", "sell", "downgrade", "plunge", "plunges", "drop", "drops",
+    "loss", "losses", "miss", "misses", "weak", "decline", "declines",
+    "crash", "fraud", "lawsuit", "recession", "cut", "cuts", "warning",
+    "warns", "risk", "risks", "overvalued", "bubble", "slump", "layoffs",
+)
+
+
+def _contains_word(text: str, keyword: str) -> bool:
+    """词边界匹配：避免 'beat' 命中 'beats' 这类子串重复计数。"""
+    import re
+
+    return re.search(rf"\b{re.escape(keyword)}\b", text) is not None
+
+
+def _score_reddit_text(text: str) -> int:
+    """对单条文本做关键词情绪计数：正向 +1，负向 -1。
+
+    使用**词边界**匹配，避免 "beat" 命中 "beats"、"surge" 命中 "surges"
+    这类子串重复计数。
+    """
+    if not text:
+        return 0
+
+    lowered = text.lower()
+    positive = sum(
+        1 for keyword in _REDDIT_POSITIVE_KEYWORDS if _contains_word(lowered, keyword)
+    )
+    negative = sum(
+        1 for keyword in _REDDIT_NEGATIVE_KEYWORDS if _contains_word(lowered, keyword)
+    )
+    return positive - negative
+
+
+def _reddit_sentiment_label(score: float) -> str:
+    """把 -1 ~ 1 的情绪分映射为中文标签。"""
+    if score >= 0.4:
+        return "乐观"
+    if score >= 0.1:
+        return "中性偏乐观"
+    if score > -0.1:
+        return "中性"
+    if score > -0.4:
+        return "中性偏悲观"
+    return "悲观"
+
+
+def get_reddit_sentiment(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    curr_date: Annotated[str, "current date in yyyy-mm-dd format"],
+    look_back_days: Annotated[int, "how many days to look back"] = 7,
+    max_limit_per_day: Annotated[int, "Maximum number of posts per day"] = 10,
+) -> str:
+    """
+    从 Reddit 公司相关帖子中提取情绪摘要。
+
+    数据来源为本地 Reddit 数据集（``data/reddit_data/company_news/*.jsonl``）。
+    数据集缺失或读取失败时返回明确的缺失提示，**不抛出异常** ——
+    情绪分析属于辅助信息，不应因数据源缺失而中断整条分析链路。
+
+    Args:
+        ticker: 公司代码，如 AAPL
+        curr_date: 当前日期（YYYY-MM-DD）
+        look_back_days: 回溯天数
+        max_limit_per_day: 每天最多抓取的帖子数
+
+    Returns:
+        str: 中文情绪摘要（Markdown）
+    """
+    from datetime import timedelta
+
+    try:
+        end_date = datetime.strptime(curr_date, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return f"## Reddit情绪分析\n无法解析分析日期: {curr_date}"
+
+    posts: list = []
+    data_path = os.path.join(DATA_DIR, "reddit_data")
+
+    try:
+        for offset in range(look_back_days):
+            day = (end_date - timedelta(days=offset)).strftime("%Y-%m-%d")
+            try:
+                day_posts = fetch_top_from_category(
+                    "company_news",
+                    day,
+                    max_limit_per_day,
+                    ticker,
+                    data_path=data_path,
+                )
+            except Exception:
+                # 单日数据缺失（数据集未覆盖该日期）时跳过
+                continue
+            if day_posts:
+                posts.extend(day_posts)
+    except Exception as exc:
+        logger.warning(f"Reddit 情绪数据读取失败: {exc}")
+        return f"## Reddit情绪分析\n数据获取失败: {exc}"
+
+    if not posts:
+        return (
+            f"## Reddit情绪分析\n"
+            f"**{ticker}** 在 {curr_date} 往前 {look_back_days} 天内"
+            f"没有可用的 Reddit 讨论数据（可能是本地数据集未覆盖该时段）。"
+        )
+
+    total_score = 0
+    assessed = 0
+    for post in posts:
+        score = _score_reddit_text(f"{post.get('title', '')} {post.get('content', '')}")
+        if score != 0:
+            assessed += 1
+            total_score += score
+
+    raw_score = total_score / max(1, assessed) if assessed else 0.0
+    # 归一化到 -1 ~ 1
+    normalized = max(-1.0, min(1.0, raw_score / 3.0))
+    label = _reddit_sentiment_label(normalized)
+    index = int(round((normalized + 1) / 2 * 100))
+
+    top_posts = sorted(posts, key=lambda p: p.get("upvotes", 0), reverse=True)[:5]
+    highlights = "\n".join(
+        f"- {post.get('title', '').strip()}（↑{post.get('upvotes', 0)}）"
+        for post in top_posts
+        if post.get("title")
+    )
+
+    return f"""## Reddit情绪分析
+
+**股票**: {ticker}
+**分析日期**: {curr_date}
+**统计窗口**: 回溯 {look_back_days} 天
+
+### 情绪指标
+- 讨论热度: {len(posts)} 篇相关帖子
+- 情绪倾向: {label}（情绪分 {index}/100）
+- 正负信号比: {max(0, total_score)} : {max(0, -total_score)}
+
+### 热门讨论
+{highlights or '- 无'}
+
+*注：情绪分基于英文关键词的轻量启发式计算，仅供参考。*"""
+
+
 def get_stock_stats_indicators_window(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],

@@ -15,6 +15,8 @@ class ScrapyCrawlerService:
     def __init__(self):
         # Initialize MongoDB connection with fallback
         self.client = None
+        # 数据库初始化推迟到首次使用（避免模块导入阶段的网络 I/O）
+        self._db_initialized = False
         self.db = None
         self.popularity_collection = None
         self.capital_flow_collection = None
@@ -33,7 +35,6 @@ class ScrapyCrawlerService:
             self.expert_ranking_collection = self.db.expert_ranking_data
             
             # Initialize indexes
-            self._init_indexes()
             self.mongodb_available = True
             logger.info("✅ MongoDB连接成功")
         except Exception as e:
@@ -52,6 +53,10 @@ class ScrapyCrawlerService:
     
     def _init_indexes(self):
         """Initialize database indexes."""
+        # 惰性初始化守卫：只在首次访问数据库时执行一次
+        if getattr(self, "_db_initialized", False):
+            return
+        self._db_initialized = True
         try:
             # Popularity collection indexes - allow multiple records for same code but different crawled_at
             self.popularity_collection.create_index([("code", ASCENDING), ("crawled_at", DESCENDING)])
@@ -131,6 +136,7 @@ class ScrapyCrawlerService:
     
     def save_popularity_data(self, data):
         """Save popularity ranking data to database or local file."""
+        self._init_indexes()
         if not data:
             return 0
         
@@ -191,6 +197,7 @@ class ScrapyCrawlerService:
     
     def save_capital_flow_data(self, data):
         """Save capital flow data to database or local file."""
+        self._init_indexes()
         if not data:
             return 0
         
@@ -242,6 +249,7 @@ class ScrapyCrawlerService:
     
     def save_expert_ranking_data(self, data):
         """Save expert ranking data to database or local file."""
+        self._init_indexes()
         if not data:
             return 0
         
@@ -337,6 +345,7 @@ class ScrapyCrawlerService:
     
     def get_popularity_data(self, page=1, page_size=20):
         """Get paginated popularity data with deduplication."""
+        self._init_indexes()
         from pymongo import DESCENDING
         
         # Get the most recent record for each stock code
@@ -389,6 +398,7 @@ class ScrapyCrawlerService:
     
     def get_capital_flow_data(self, page=1, page_size=20):
         """Get paginated capital flow data with deduplication."""
+        self._init_indexes()
         from pymongo import DESCENDING
         
         # Get the most recent record for each stock code
@@ -441,6 +451,7 @@ class ScrapyCrawlerService:
     
     def get_expert_ranking_data(self, page=1, page_size=20):
         """Get paginated expert ranking data with deduplication."""
+        self._init_indexes()
         from datetime import datetime
         
         # Get all expert ranking data first for de-duplication
@@ -497,6 +508,7 @@ class ScrapyCrawlerService:
     
     def get_cross_analysis_data(self, page=1, page_size=20):
         """Get cross analysis data with popularity and capital flow ranks."""
+        self._init_indexes()
         from datetime import datetime, timedelta
         
         # Get all expert ranking data first for de-duplication, filter by recent 30 days

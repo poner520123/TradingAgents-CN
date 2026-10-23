@@ -62,7 +62,10 @@ export const useAuthStore = defineStore('auth', {
       roles: [],
 
       loginLoading: false,
-      redirectPath: '/'
+      // 默认首页为「高级策略」；必须初始化为 '/strategy' 而不是 '/'，
+      // 否则 getAndClearRedirectPath() 中的 `|| '/strategy'` 兜底不会生效
+      //（'/' 是真值），登录后会跳回根路径。
+      redirectPath: '/strategy'
     }
   },
 
@@ -433,10 +436,10 @@ export const useAuthStore = defineStore('auth', {
       this.redirectPath = path
     },
     
-    // 获取并清除重定向路径
+    // 获取并清除重定向路径（默认首页：高级策略）
     getAndClearRedirectPath(): string {
-      const path = this.redirectPath || '/dashboard'
-      this.redirectPath = '/dashboard'
+      const path = this.redirectPath || '/strategy'
+      this.redirectPath = '/strategy'
       return path
     },
     

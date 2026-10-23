@@ -17,10 +17,11 @@ logger = logging.getLogger(__name__)
 class StockSelectorService:
     def __init__(self):
         """初始化股票筛选服务"""
+        # 数据库初始化推迟到首次使用（避免模块导入阶段的网络 I/O）
+        self._db_initialized = False
         self.db = get_mongo_db_sync()
         self.crawler_collection = self.db.crawler_data
         self.screening_results_collection = self.db.screening_results
-        self._init_db()
         
         # 通知配置 - 使用用户提供的Webhook
         self.dingtalk_config = {
@@ -36,6 +37,10 @@ class StockSelectorService:
     
     def _init_db(self):
         """初始化数据库索引"""
+        # 惰性初始化守卫：只在首次访问数据库时执行一次
+        if getattr(self, "_db_initialized", False):
+            return
+        self._db_initialized = True
         try:
             # 为筛选结果创建索引
             self.screening_results_collection.create_index([("screening_time", DESCENDING)])
@@ -45,6 +50,7 @@ class StockSelectorService:
     
     def get_latest_crawler_data(self, hours: int = 3) -> List[Dict]:
         """获取最近几小时的爬虫数据"""
+        self._init_db()
         try:
             cutoff_time = datetime.utcnow() - timedelta(hours=hours)
             cursor = self.crawler_collection.find(
@@ -321,6 +327,7 @@ class StockSelectorService:
     
     def save_screening_result(self, stock_data: Dict, report: str) -> bool:
         """保存筛选结果到数据库"""
+        self._init_db()
         try:
             result = {
                 "stock_code": stock_data["stock_code"],

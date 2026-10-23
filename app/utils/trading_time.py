@@ -177,3 +177,34 @@ def get_trading_status(now: Optional[datetime] = None) -> str:
     else:
         return "closed"
 
+
+def is_active_trading_period(now: Optional[datetime] = None) -> bool:
+    """
+    判断是否在活跃交易时段内（9:00-15:00）
+    包括开盘前半小时、上午交易、午间休市和下午交易
+    
+    此函数用于爬虫间隔控制：
+    - 活跃时段（9:00-15:00）：3分钟一次
+    - 其他时间：10分钟一次
+
+    Args:
+        now: 指定时间，默认为当前时间（使用配置的时区）
+
+    Returns:
+        bool: 是否在活跃交易时段内
+    """
+    tz = ZoneInfo(settings.TIMEZONE)
+    now = now or datetime.now(tz)
+    
+    # 周末
+    if now.weekday() > 4:
+        return False
+    
+    t = now.time()
+    
+    # 活跃时段：9:00 - 15:00
+    active_start = dtime(9, 0)
+    active_end = dtime(15, 0)
+    
+    return active_start <= t <= active_end
+

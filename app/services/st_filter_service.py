@@ -13,6 +13,8 @@ class STFilterService:
     def __init__(self):
         # MongoDB连接
         from app.core.database import get_mongo_db_sync
+        # 数据库初始化推迟到首次使用（避免模块导入阶段的网络 I/O）
+        self._db_initialized = False
         self.db = get_mongo_db_sync()
         self.st_collection = self.db["st_stocks"]
         self.filter_log_collection = self.db["st_filter_logs"]
@@ -32,10 +34,13 @@ class STFilterService:
         self.update_interval = timedelta(hours=24)  # 每天更新一次
         
         # 加载ST股票列表
-        self.load_st_stocks()
     
     def load_st_stocks(self):
         """从数据库加载ST股票列表"""
+        # 惰性初始化守卫：只在首次访问数据库时执行一次
+        if getattr(self, "_db_initialized", False):
+            return
+        self._db_initialized = True
         logger.info("=" * 60)
         logger.info("📥 开始加载ST股票列表")
         logger.info("=" * 60)
@@ -70,6 +75,7 @@ class STFilterService:
     
     def is_st_stock_by_name(self, stock_name: str) -> bool:
         """通过股票名称判断是否为ST股票"""
+        self.load_st_stocks()
         if not stock_name:
             return False
         
@@ -86,6 +92,8 @@ class STFilterService:
     
     def is_st_stock_by_code(self, stock_code: str) -> bool:
         """通过股票代码判断是否为ST股票"""
+        # 代码路径同样依赖内存中的 ST 列表，需确保已加载
+        self.load_st_stocks()
         if not stock_code:
             return False
         
@@ -139,6 +147,7 @@ class STFilterService:
     
     def log_filter(self, removed_items: List[Dict]):
         """记录ST股票过滤日志"""
+        self.load_st_stocks()
         try:
             log_entry = {
                 "filter_time": datetime.now(),
@@ -154,6 +163,7 @@ class STFilterService:
     
     def update_st_stock_list(self, st_stocks: List[Dict]) -> Dict[str, int]:
         """更新ST股票列表"""
+        self.load_st_stocks()
         logger.info(f"🔄 开始更新ST股票列表，待处理 {len(st_stocks)} 条记录")
         
         added = 0
@@ -212,6 +222,7 @@ class STFilterService:
     
     def get_filter_logs(self, limit: int = 100, page: int = 1) -> Dict[str, any]:
         """获取ST股票过滤日志"""
+        self.load_st_stocks()
         skip = (page - 1) * limit
         
         cursor = self.filter_log_collection.find().sort("filter_time", -1).skip(skip).limit(limit)
@@ -233,6 +244,7 @@ class STFilterService:
     
     def get_st_stock_list(self) -> List[Dict]:
         """获取当前ST股票列表"""
+        self.load_st_stocks()
         cursor = self.st_collection.find()
         stocks = list(cursor)
         

@@ -149,6 +149,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, Refresh, Download } from '@element-plus/icons-vue'
 import { analysisApi } from '@/api/analysis'
+import { useAuthStore } from '@/stores/auth'
 import { marked } from 'marked'
 import TaskResultDialog from '@/components/Global/TaskResultDialog.vue'
 import TaskReportDialog from '@/components/Global/TaskReportDialog.vue'
@@ -196,10 +197,13 @@ const connectTaskWebSocket = (taskId: string) => {
   }
 
   try {
-    const token = localStorage.getItem('token') || ''
+    // token 存储键为 'auth-token'（见 stores/auth.ts），
+    // 且后端 /api/ws/tasks/{task_id} 要求以 query 参数携带 JWT
+    const token = useAuthStore().token || localStorage.getItem('auth-token') || ''
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const wsUrl = `${wsProtocol}//${host}/api/ws/task/${taskId}`
+    // 后端路由为 /api/ws/tasks/{task_id}（注意是 tasks 复数）
+    const wsUrl = `${wsProtocol}//${host}/api/ws/tasks/${taskId}?token=${encodeURIComponent(token)}`
 
     const ws = new WebSocket(wsUrl)
 

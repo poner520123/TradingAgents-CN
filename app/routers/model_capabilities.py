@@ -4,9 +4,11 @@
 
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any, Optional
+from enum import Enum
 from pydantic import BaseModel, Field
 
 from app.services.model_capability_service import get_model_capability_service
+from app.services.config_service import config_service
 from app.constants.model_capabilities import (
     DEFAULT_MODEL_CAPABILITIES,
     ANALYSIS_DEPTH_REQUIREMENTS,
@@ -72,6 +74,49 @@ class BatchInitRequest(BaseModel):
     overwrite: bool = Field(default=False, description="是否覆盖已有配置")
 
 
+# ==================== 能力参数辅助方法 ====================
+
+# LLMConfig 中能力参数的默认值：只要这些值都还是默认值，就认为该模型尚未初始化能力参数
+DEFAULT_CAPABILITY_FIELDS: Dict[str, Any] = {
+    "capability_level": 2,
+    "suitable_roles": ["both"],
+    "features": [],
+    "recommended_depths": ["快速", "基础", "标准"],
+    "performance_metrics": None
+}
+
+
+def _plain_values(values: Optional[List[Any]]) -> List[Any]:
+    """把枚举成员转换成原始值列表
+
+    Python 3.11+ 中 str(ModelRole.QUICK_ANALYSIS) 得到的是 'ModelRole.QUICK_ANALYSIS'，
+    无法再被 ModelRole() 解析回来，这里统一使用 .value 转换。
+    """
+    return [value.value if isinstance(value, Enum) else value for value in (values or [])]
+
+
+def _has_capability_config(llm_config) -> bool:
+    """判断模型是否已经配置过能力参数"""
+    return (
+        llm_config.capability_level != DEFAULT_CAPABILITY_FIELDS["capability_level"]
+        or _plain_values(llm_config.suitable_roles) != DEFAULT_CAPABILITY_FIELDS["suitable_roles"]
+        or _plain_values(llm_config.features) != DEFAULT_CAPABILITY_FIELDS["features"]
+        or _plain_values(llm_config.recommended_depths) != DEFAULT_CAPABILITY_FIELDS["recommended_depths"]
+        or llm_config.performance_metrics is not None
+    )
+
+
+def _capability_matches(llm_config, target: Dict[str, Any]) -> bool:
+    """判断模型当前的能力参数是否已经与目标值一致"""
+    return (
+        llm_config.capability_level == target["capability_level"]
+        and _plain_values(llm_config.suitable_roles) == target["suitable_roles"]
+        and _plain_values(llm_config.features) == target["features"]
+        and _plain_values(llm_config.recommended_depths) == target["recommended_depths"]
+        and llm_config.performance_metrics == target["performance_metrics"]
+    )
+
+
 # ==================== API路由 ====================
 
 @router.get("/default-configs")
@@ -88,8 +133,8 @@ async def get_default_model_configs():
             configs[model_name] = {
                 "model_name": model_name,
                 "capability_level": config["capability_level"],
-                "suitable_roles": [str(role) for role in config["suitable_roles"]],
-                "features": [str(feature) for feature in config["features"]],
+                "suitable_roles": _plain_values(config["suitable_roles"]),
+                "features": _plain_values(config["features"]),
                 "recommended_depths": config["recommended_depths"],
                 "performance_metrics": config.get("performance_metrics"),
                 "description": config.get("description")
@@ -120,7 +165,7 @@ async def get_depth_requirements():
                 "min_capability": req["min_capability"],
                 "quick_model_min": req["quick_model_min"],
                 "deep_model_min": req["deep_model_min"],
-                "required_features": [str(f) for f in req["required_features"]],
+                "required_features": _plain_values(req["required_features"]),
                 "description": req["description"]
             }
 
@@ -154,11 +199,11 @@ async def get_all_badges():
                 for level in range(1, 6)
             },
             "roles": {
-                str(role): get_role_badge(role)
+                role.value: get_role_badge(role)
                 for role in ModelRole
             },
             "features": {
-                str(feature): get_feature_badge(feature)
+                feature.value: get_feature_badge(feature)
                 for feature in ModelFeature
             }
         }
@@ -259,54 +304,84 @@ async def batch_init_capabilities(request: BatchInitRequest):
     """
     批量初始化模型能力
 
-    为数据库中的模型配置自动填充能力参数。
+    为数据库中的模型配置自动填充能力参数，并将结果持久化到数据库。
     """
     try:
-        # 获取所有LLM配置
-        llm_configs = unified_config.get_llm_configs()
+        # 能力参数保存在系统配置（system_configs.llm_configs）里
+        config = await config_service.get_system_config()
+        if not config:
+            raise HTTPException(status_code=500, detail="未找到系统配置，无法初始化模型能力")
 
         updated_count = 0
         skipped_count = 0
+        updated_configs = []
 
-        for config in llm_configs:
-            model_name = config.model_name
+        for llm_config in config.llm_configs:
+            model_name = llm_config.model_name
 
-            # 检查是否已有能力配置
-            has_capability = hasattr(config, 'capability_level') and config.capability_level is not None
-
-            if has_capability and not request.overwrite:
+            default_config = DEFAULT_MODEL_CAPABILITIES.get(model_name)
+            if not default_config:
+                logger.warning(f"模型 {model_name} 没有默认配置，跳过")
                 skipped_count += 1
                 continue
 
-            # 从默认配置获取能力参数
-            if model_name in DEFAULT_MODEL_CAPABILITIES:
-                default_config = DEFAULT_MODEL_CAPABILITIES[model_name]
-
-                # 更新配置
-                config.capability_level = default_config["capability_level"]
-                config.suitable_roles = [str(role) for role in default_config["suitable_roles"]]
-                config.features = [str(feature) for feature in default_config["features"]]
-                config.recommended_depths = default_config["recommended_depths"]
-                config.performance_metrics = default_config.get("performance_metrics")
-
-                # 保存到数据库
-                # TODO: 实现保存逻辑
-                updated_count += 1
-                logger.info(f"已初始化模型 {model_name} 的能力参数")
-            else:
-                logger.warning(f"模型 {model_name} 没有默认配置，跳过")
+            # 已经配置过能力参数且未要求覆盖时跳过
+            if not request.overwrite and _has_capability_config(llm_config):
+                logger.info(f"模型 {model_name} 已配置能力参数，跳过")
                 skipped_count += 1
+                continue
+
+            target = {
+                "capability_level": int(default_config["capability_level"]),
+                "suitable_roles": _plain_values(default_config["suitable_roles"]),
+                "features": _plain_values(default_config["features"]),
+                "recommended_depths": _plain_values(default_config["recommended_depths"]),
+                "performance_metrics": default_config.get("performance_metrics")
+            }
+
+            # 已经是目标值，无需写入
+            if _capability_matches(llm_config, target):
+                logger.info(f"模型 {model_name} 的能力参数已是最新，无需更新")
+                skipped_count += 1
+                continue
+
+            # 更新配置
+            llm_config.capability_level = target["capability_level"]
+            llm_config.suitable_roles = target["suitable_roles"]
+            llm_config.features = target["features"]
+            llm_config.recommended_depths = target["recommended_depths"]
+            llm_config.performance_metrics = target["performance_metrics"]
+
+            updated_count += 1
+            updated_configs.append(llm_config)
+            logger.info(f"已初始化模型 {model_name} 的能力参数")
+
+        if updated_count > 0:
+            # 保存到数据库（同时更新配置版本号）
+            if not await config_service.save_system_config(config):
+                raise HTTPException(status_code=500, detail="模型能力参数保存失败")
+
+            # 同步到传统配置文件，保证运行时读取 models.json 时也能拿到能力参数
+            for llm_config in updated_configs:
+                if not unified_config.sync_llm_capability_to_legacy(llm_config):
+                    logger.warning(
+                        f"模型 {llm_config.model_name} 的能力参数未同步到配置文件"
+                        f"（传统配置中不存在该模型或写入失败）"
+                    )
 
         return ok(
             {
                 "updated_count": updated_count,
                 "skipped_count": skipped_count,
-                "total_count": len(llm_configs)
+                "total_count": len(config.llm_configs),
+                "updated_models": [c.model_name for c in updated_configs]
             },
             f"批量初始化完成：更新{updated_count}个，跳过{skipped_count}个"
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"批量初始化失败: {e}")
+        logger.error(f"批量初始化失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

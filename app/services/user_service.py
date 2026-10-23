@@ -31,10 +31,17 @@ class UserService:
         self.client = MongoClient(settings.MONGO_URI)
         self.db = self.client[settings.MONGO_DB]
         self.users_collection = self.db.users
-        self._ensure_indexes()
-    
+        # 索引创建推迟到首次真正访问数据库时（见 _ensure_indexes）。
+        # 模块导入阶段不做任何网络 I/O —— 否则仅 import 本模块就要等待
+        # MongoDB 连接超时（本机无 MongoDB 时约 30 秒）。
+        self._indexes_ready = False
+
     def _ensure_indexes(self):
-        """确保索引已创建"""
+        """确保索引已创建（惰性：首次访问数据库时执行一次）"""
+        if self._indexes_ready:
+            return
+        # 先置位再执行：即使创建失败也不重复尝试，避免每次请求都卡在超时上
+        self._indexes_ready = True
         try:
             # 用户名唯一索引（用于登录和用户查找）
             self.users_collection.create_index([("username", 1)], unique=True, background=True)
@@ -76,6 +83,7 @@ class UserService:
     
     async def create_user(self, user_data: UserCreate) -> Optional[User]:
         """创建用户"""
+        self._ensure_indexes()
         try:
             # 检查用户名是否已存在
             existing_user = self.users_collection.find_one({"username": user_data.username})
@@ -139,6 +147,7 @@ class UserService:
     
     async def authenticate_user(self, username: str, password: str) -> Optional[User]:
         """用户认证"""
+        self._ensure_indexes()
         try:
             logger.info(f"🔍 [authenticate_user] 开始认证用户: {username}")
 
@@ -184,6 +193,7 @@ class UserService:
     
     def get_user_by_username(self, username: str) -> Optional[User]:
         """根据用户名获取用户"""
+        self._ensure_indexes()
         try:
             user_doc = self.users_collection.find_one({"username": username})
             if user_doc:
@@ -195,6 +205,7 @@ class UserService:
     
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         """根据用户ID获取用户"""
+        self._ensure_indexes()
         try:
             if not ObjectId.is_valid(user_id):
                 return None
@@ -209,6 +220,7 @@ class UserService:
     
     async def update_user(self, username: str, user_data: UserUpdate) -> Optional[User]:
         """更新用户信息"""
+        self._ensure_indexes()
         try:
             update_data = {"updated_at": datetime.utcnow()}
             
@@ -251,6 +263,7 @@ class UserService:
     
     async def change_password(self, username: str, old_password: str, new_password: str) -> bool:
         """修改密码"""
+        self._ensure_indexes()
         try:
             # 验证旧密码
             user = await self.authenticate_user(username, old_password)
@@ -283,6 +296,7 @@ class UserService:
     
     async def reset_password(self, username: str, new_password: str) -> bool:
         """重置密码（管理员操作）"""
+        self._ensure_indexes()
         try:
             new_hashed_password = self.hash_password(new_password)
             result = self.users_collection.update_one(
@@ -308,6 +322,7 @@ class UserService:
     
     async def create_admin_user(self, username: str = "admin", password: str = "admin123", email: str = "admin@tradingagents.cn") -> Optional[User]:
         """创建管理员用户"""
+        self._ensure_indexes()
         try:
             # 检查是否已存在管理员
             existing_admin = self.users_collection.find_one({"username": username})
@@ -357,6 +372,7 @@ class UserService:
     
     async def list_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
         """获取用户列表"""
+        self._ensure_indexes()
         try:
             cursor = self.users_collection.find().skip(skip).limit(limit)
             users = []
@@ -387,6 +403,7 @@ class UserService:
     
     async def deactivate_user(self, username: str) -> bool:
         """禁用用户"""
+        self._ensure_indexes()
         try:
             result = self.users_collection.update_one(
                 {"username": username},
@@ -411,6 +428,7 @@ class UserService:
     
     async def activate_user(self, username: str) -> bool:
         """激活用户"""
+        self._ensure_indexes()
         try:
             result = self.users_collection.update_one(
                 {"username": username},

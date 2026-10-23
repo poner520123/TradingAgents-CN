@@ -6,6 +6,11 @@
     router
     class="sidebar-menu"
   >
+    <el-menu-item index="/strategy">
+      <el-icon><MagicStick /></el-icon>
+      <template #title>高级策略</template>
+    </el-menu-item>
+
     <el-menu-item index="/dashboard">
       <el-icon><Odometer /></el-icon>
       <template #title>仪表板</template>
@@ -33,28 +38,12 @@
       <template #title>任务中心</template>
     </el-menu-item>
 
-    <el-menu-item index="/screening">
-      <el-icon><Search /></el-icon>
-      <template #title>股票筛选</template>
-    </el-menu-item>
-
     <el-menu-item index="/favorites">
       <el-icon><Star /></el-icon>
       <template #title>自选股</template>
     </el-menu-item>
 
-    <el-menu-item index="/learning">
-      <el-icon><Reading /></el-icon>
-      <template #title>学习中心</template>
-    </el-menu-item>
-
-    <!-- 分析报告已移至“股票分析”子菜单，保留注释便于追踪 -->
-    <!--
-    <el-menu-item index="/reports">
-      <el-icon><Document /></el-icon>
-      <template #title>分析报告</template>
-    </el-menu-item>
-    -->
+    <!-- 股票筛选 / 学习中心 / 关于 已移至“设置 → 更多”子菜单 -->
 
     <el-sub-menu index="/settings">
       <template #title>
@@ -89,12 +78,24 @@
         <el-menu-item index="/settings/scheduler">定时任务</el-menu-item>
         <el-menu-item index="/settings/usage">使用统计</el-menu-item>
       </el-sub-menu>
-    </el-sub-menu>
 
-    <el-menu-item index="/about">
-      <el-icon><InfoFilled /></el-icon>
-      <template #title>关于</template>
-    </el-menu-item>
+      <!-- 更多：原顶级菜单下移 -->
+      <el-sub-menu index="/settings-more">
+        <template #title>更多</template>
+        <el-menu-item index="/screening">
+          <el-icon><Search /></el-icon>
+          <template #title>股票筛选</template>
+        </el-menu-item>
+        <el-menu-item index="/learning">
+          <el-icon><Reading /></el-icon>
+          <template #title>学习中心</template>
+        </el-menu-item>
+        <el-menu-item index="/about">
+          <el-icon><InfoFilled /></el-icon>
+          <template #title>关于</template>
+        </el-menu-item>
+      </el-sub-menu>
+    </el-sub-menu>
   </el-menu>
 </template>
 
@@ -112,6 +113,7 @@ import {
   /* Document 移除：不再使用顶级分析报告菜单图标 */
   Setting,
   InfoFilled,
+  MagicStick,
   CreditCard
 } from '@element-plus/icons-vue'
 

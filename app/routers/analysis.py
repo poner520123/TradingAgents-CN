@@ -911,38 +911,6 @@ async def get_batch(batch_id: str, user: dict = Depends(get_current_user), svc: 
         raise HTTPException(status_code=404, detail="batch not found")
     return b
 
-# 任务和批次查询端点
-# 注意：这个路由被移到了 /tasks/{task_id}/status 之后，避免路由冲突
-# @router.get("/tasks/{task_id}")
-# async def get_task(
-#     task_id: str,
-#     user: dict = Depends(get_current_user),
-#     svc: QueueService = Depends(get_queue_service)
-# ):
-#     """获取任务详情"""
-#     t = await svc.get_task(task_id)
-#     if not t or t.get("user") != user["id"]:
-#         raise HTTPException(status_code=404, detail="任务不存在")
-#     return t
-
-# 原有的路由已被新的异步实现替代
-# @router.get("/tasks/{task_id}/status")
-# async def get_task_status_old(
-#     task_id: str,
-#     user: dict = Depends(get_current_user)
-# ):
-#     """获取任务状态和进度（旧版实现）"""
-#     try:
-#         status = await get_analysis_service().get_task_status(task_id)
-#         if not status:
-#             raise HTTPException(status_code=404, detail="任务不存在")
-#         return {
-#             "success": True,
-#             "data": status
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-
 @router.post("/tasks/{task_id}/cancel")
 async def cancel_task(
     task_id: str,

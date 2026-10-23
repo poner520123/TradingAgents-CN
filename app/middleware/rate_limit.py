@@ -4,12 +4,36 @@
 """
 
 from fastapi import Request, Response, HTTPException
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 import logging
 from typing import Callable, Dict, Optional
 from app.core.redis_client import get_redis_service, RedisKeys
 
 logger = logging.getLogger(__name__)
+
+
+def _http_exception_response(exc: HTTPException) -> JSONResponse:
+    """
+    将中间件内抛出的 HTTPException 转换为等价的 JSON 响应。
+
+    为什么不能直接 ``raise HTTPException``：
+    Starlette 的中间件栈结构为::
+
+        ServerErrorMiddleware → 用户中间件 → ExceptionMiddleware → 路由
+
+    负责把 HTTPException 转换成 JSON 响应的 ``ExceptionMiddleware`` 位于**用户中间件之内**，
+    因此在用户中间件中抛出的 HTTPException 不会被它捕获，最终由最外层的
+    ``ServerErrorMiddleware`` 处理 —— 客户端收到的是 500 而不是预期的 429。
+
+    这里直接返回与 FastAPI 默认处理器完全一致的响应体（``{"detail": ...}``），
+    保持对外契约不变。
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=getattr(exc, "headers", None),
+    )
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -41,13 +65,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         # 检查速率限制
         try:
+            redis_service = get_redis_service()
+            if not redis_service.is_available:
+                # Redis不可用，跳过速率限制
+                return await call_next(request)
             await self.check_rate_limit(user_id, request.url.path)
-        except HTTPException:
-            raise
+        except HTTPException as exc:
+            # 中间件内抛出的 HTTPException 不会被 ExceptionMiddleware 捕获，
+            # 必须直接转成响应，否则客户端会收到 500 而不是 429。
+            logger.warning(
+                f"速率限制触发 - 用户: {user_id}, 端点: {request.url.path}"
+            )
+            return _http_exception_response(exc)
         except Exception as exc:
-            logger.error(f"速率限制检查失败: {exc}")
+            logger.warning(f"速率限制检查失败: {exc}，允许请求通过")
             # 如果Redis不可用，允许请求通过
-        
+
         return await call_next(request)
     
     async def check_rate_limit(self, user_id: str, endpoint: str):
@@ -122,13 +155,19 @@ class QuotaMiddleware(BaseHTTPMiddleware):
         
         # 检查每日配额
         try:
+            redis_service = get_redis_service()
+            if not redis_service.is_available:
+                # Redis不可用，跳过配额限制
+                return await call_next(request)
             await self.check_daily_quota(user_id)
-        except HTTPException:
-            raise
+        except HTTPException as exc:
+            # 同上：中间件内的 HTTPException 必须直接转成响应
+            logger.warning(f"每日配额超限 - 用户: {user_id}")
+            return _http_exception_response(exc)
         except Exception as exc:
-            logger.error(f"配额检查失败: {exc}")
+            logger.warning(f"配额检查失败: {exc}，允许请求通过")
             # 如果Redis不可用，允许请求通过
-        
+
         return await call_next(request)
     
     async def check_daily_quota(self, user_id: str):

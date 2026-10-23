@@ -19,14 +19,19 @@ class AdvancedStockSelectorService:
     
     def __init__(self):
         """初始化高级股票筛选服务"""
+        # 数据库初始化推迟到首次使用（避免模块导入阶段的网络 I/O）
+        self._db_initialized = False
         self.db = get_mongo_db_sync()
         self.crawler_collection = self.db.crawler_data
         self.stock_data_collection = self.db.stock_data
         self.screening_results_collection = self.db.screening_results
-        self._init_db()
     
     def _init_db(self):
         """初始化数据库索引"""
+        # 惰性初始化守卫：只在首次访问数据库时执行一次
+        if getattr(self, "_db_initialized", False):
+            return
+        self._db_initialized = True
         try:
             self.screening_results_collection.create_index([("screening_time", DESCENDING)])
             self.screening_results_collection.create_index([("stock_code", 1), ("screening_time", DESCENDING)])
@@ -35,6 +40,7 @@ class AdvancedStockSelectorService:
     
     def get_latest_stock_data(self, limit: int = 100) -> List[Dict]:
         """获取最新涨幅的前N个股票数据"""
+        self._init_db()
         try:
             # 获取最近24小时的数据
             cutoff_time = datetime.utcnow() - timedelta(hours=24)
@@ -65,6 +71,7 @@ class AdvancedStockSelectorService:
     
     def calculate_moving_averages(self, stock_code: str, days: int = 30) -> Tuple[Optional[float], Optional[float], Optional[float]]:
         """计算股票的5日、13日、21日均线"""
+        self._init_db()
         try:
             # 获取股票历史数据
             cursor = self.stock_data_collection.find(
@@ -98,6 +105,7 @@ class AdvancedStockSelectorService:
     
     def calculate_left_pressure(self, stock_code: str, days: int = 60) -> float:
         """计算左侧压力位（左峰或平台）"""
+        self._init_db()
         try:
             # 获取股票历史数据
             cursor = self.stock_data_collection.find(
@@ -141,6 +149,7 @@ class AdvancedStockSelectorService:
     
     def calculate_volume_change(self, stock_code: str, days: int = 5) -> float:
         """计算成交量变化"""
+        self._init_db()
         try:
             # 获取股票历史数据
             cursor = self.stock_data_collection.find(
@@ -332,6 +341,7 @@ class AdvancedStockSelectorService:
     
     def save_screening_result(self, stock: Dict, report: str) -> bool:
         """保存筛选结果到数据库"""
+        self._init_db()
         try:
             result = {
                 "stock_code": stock.get("stock_code"),

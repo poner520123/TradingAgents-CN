@@ -31,38 +31,56 @@ class StockMapService:
         self.collection = None
         self.initialization_complete = False
         self.load_errors = []
-        
-        # 尝试初始化MongoDB连接
-        try:
-            self.client = MongoClient(settings.MONGO_URI)
-            self.db = self.client[settings.MONGO_DB]
-            self.collection = self.db["stock_name_code_mapping"]
-            # 创建唯一索引（仅对name字段，code字段可能存在重复）
-            self.collection.create_index([("name", 1)], unique=True)
-            self.collection.create_index([("code", 1)])  # 非唯一索引，用于加速查询
-            self.mongodb_available = True
-            logger.info("✅ MongoDB连接成功，股票映射服务初始化完成")
-        except Exception as e:
-            logger.warning(f"⚠️ MongoDB连接失败: {e}，将使用内存缓存模式")
-            self.load_errors.append(f"MongoDB连接失败: {e}")
-            self.mongodb_available = False
-        
-        # 初始化内存缓存
+
+        # 内存缓存
         self.name_to_code: Dict[str, str] = {}
         self.code_to_name: Dict[str, str] = {}
-        
-        # 从数据库加载所有映射到缓存
-        self._rebuild_cache()
-        
-        # 检查并同步映射（如果需要）
-        self.sync_mappings_if_needed()
-        
-        # 验证映射表完整性
-        self.validate_integrity()
-        
-        # 标记初始化完成
-        self.initialization_complete = True
-        logger.info("✅ 股票映射服务初始化全部完成")
+
+        # 连接、索引、缓存重建全部推迟到首次实际使用时（见 _ensure_initialized）。
+        # 模块导入阶段不做任何网络 I/O —— 否则仅 import 本模块就要等待
+        # MongoDB 连接超时（本机无 MongoDB 时约 30 秒）。
+        self._initialized = False
+
+    def _ensure_initialized(self):
+        """惰性初始化：连接数据库、建索引、重建内存缓存。
+
+        只执行一次（成功或失败都算），保证导入阶段无 I/O 副作用。
+        ``_initializing`` 用于防止初始化过程内部���调用形成递归。
+        """
+        if self._initialized or getattr(self, "_initializing", False):
+            return
+        self._initializing = True
+        try:
+            # 尝试初始化MongoDB连接
+            try:
+                self.client = MongoClient(settings.MONGO_URI)
+                self.db = self.client[settings.MONGO_DB]
+                self.collection = self.db["stock_name_code_mapping"]
+                # 创建唯一索引（仅对name字段，code字段可能存在重复）
+                self.collection.create_index([("name", 1)], unique=True)
+                self.collection.create_index([("code", 1)])  # 非唯一索引，用于加速查询
+                self.mongodb_available = True
+                logger.info("✅ MongoDB连接成功，股票映射服务初始化完成")
+            except Exception as e:
+                logger.warning(f"⚠️ MongoDB连接失败: {e}，将使用内存缓存模式")
+                self.load_errors.append(f"MongoDB连接失败: {e}")
+                self.mongodb_available = False
+
+            # 从数据库加载所有映射到缓存
+            self._rebuild_cache()
+
+            # 检查并同步映射（如果需要）
+            self.sync_mappings_if_needed()
+
+            # 验证映射表完整性
+            self.validate_integrity()
+
+            # 标记初始化完成
+            self.initialization_complete = True
+            logger.info("✅ 股票映射服务初始化全部完成")
+        finally:
+            self._initializing = False
+            self._initialized = True
     
     def _rebuild_cache(self):
         """从数据库重建内存缓存"""
@@ -104,6 +122,7 @@ class StockMapService:
     
     def load_from_csv(self, csv_path: str) -> int:
         """从CSV文件加载股票名称到代码的映射"""
+        self._ensure_initialized()
         logger.info(f"📥 开始从CSV文件加载股票名称到代码的映射: {csv_path}")
         count = 0
         
@@ -136,6 +155,7 @@ class StockMapService:
     
     def should_sync_mappings(self) -> bool:
         """检查是否需要同步股票映射"""
+        self._ensure_initialized()
         # 检查数据库中是否已有映射数据
         if self.mongodb_available and self.collection is not None:
             try:
@@ -154,6 +174,7 @@ class StockMapService:
     
     def sync_mappings_if_needed(self) -> Dict[str, int]:
         """如果需要，同步股票映射"""
+        self._ensure_initialized()
         logger.info("🔄 检查是否需要同步股票映射...")
         
         if not self.should_sync_mappings():
@@ -171,6 +192,7 @@ class StockMapService:
     
     def validate_integrity(self) -> Dict[str, any]:
         """验证映射表完整性"""
+        self._ensure_initialized()
         logger.info("=" * 60)
         logger.info("🔍 开始验证映射表完整性")
         logger.info("=" * 60)
@@ -225,6 +247,7 @@ class StockMapService:
     
     def get_initialization_status(self) -> Dict[str, any]:
         """获取初始化状态信息"""
+        self._ensure_initialized()
         return {
             "initialized": self.initialization_complete,
             "mongodb_available": self.mongodb_available,
@@ -251,6 +274,7 @@ class StockMapService:
     
     def get_code_by_name(self, name: str) -> Optional[str]:
         """根据股票名称获取股票代码"""
+        self._ensure_initialized()
         # 先从缓存查询
         if name in self.name_to_code:
             return self.name_to_code[name]
@@ -285,6 +309,7 @@ class StockMapService:
     
     def get_codes_by_names(self, names: List[str]) -> Dict[str, str]:
         """根据股票名称列表批量获取股票代码"""
+        self._ensure_initialized()
         result = {}
         
         # 1. 优先使用内存缓存
@@ -340,6 +365,7 @@ class StockMapService:
     
     def upsert_map(self, name: str, code: str, market: Optional[str] = None) -> bool:
         """更新或插入股票名称到代码的映射"""
+        self._ensure_initialized()
         try:
             # 确定市场类型
             if not market:
@@ -376,6 +402,7 @@ class StockMapService:
     
     def get_all_maps(self, skip: int = 0, limit: int = 100) -> List[Dict]:
         """获取所有股票名称到代码的映射"""
+        self._ensure_initialized()
         result = []
         
         # 如果MongoDB可用，从数据库获取
@@ -406,6 +433,7 @@ class StockMapService:
     
     def get_name_by_code(self, code: str) -> Optional[str]:
         """根据股票代码获取股票名称"""
+        self._ensure_initialized()
         # 先从缓存查询
         if code in self.code_to_name:
             return self.code_to_name[code]
@@ -427,6 +455,7 @@ class StockMapService:
     
     def get_total_count(self) -> int:
         """获取股票名称到代码的映射总数"""
+        self._ensure_initialized()
         # 如果MongoDB可用，从数据库获取
         if self.mongodb_available and self.collection is not None:
             try:
@@ -439,6 +468,7 @@ class StockMapService:
     
     def get_a_stock_names(self) -> List[str]:
         """获取A股上市公司名称列表"""
+        self._ensure_initialized()
         names = []
         
         # 从namecode.csv文件中获取所有名称
@@ -559,6 +589,7 @@ class StockMapService:
     
     def supplement_stock_mappings(self) -> Dict[str, int]:
         """遍历A股上市公司名称，补充缺失的映射"""
+        self._ensure_initialized()
         logger.info("开始补充股票名称代码映射")
         
         # 获取A股上市公司名称列表
@@ -623,6 +654,7 @@ class StockMapService:
     
     def clear_mappings(self) -> bool:
         """清空所有股票名称和代码映射"""
+        self._ensure_initialized()
         try:
             # 如果MongoDB可用，清空数据库
             if self.mongodb_available and self.collection is not None:
@@ -644,6 +676,7 @@ class StockMapService:
     
     def resync_mappings(self) -> Dict[str, int]:
         """清空映射并重新同步"""
+        self._ensure_initialized()
         logger.info("开始重新同步股票名称和代码映射")
         
         # 清空现有映射

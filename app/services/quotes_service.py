@@ -250,6 +250,9 @@ class QuotesService:
             return {}
 
     async def _fetch_from_akshare(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
+        return await asyncio.to_thread(self._fetch_akshare_sync, codes)
+
+    def _fetch_akshare_sync(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
         try:
             import akshare as ak
 
@@ -279,7 +282,39 @@ class QuotesService:
             logger.error(f"AKShare获取失败: {e}", exc_info=True)
             return {}
 
+    def _fetch_spot_akshare(self) -> Dict[str, Dict[str, Optional[float]]]:
+        try:
+            import akshare as ak
+
+            result = {}
+            stock_zh_a_spot_df = ak.stock_zh_a_spot()
+
+            for _, row in stock_zh_a_spot_df.iterrows():
+                code = str(row['代码']).strip()
+                close = _safe_float(row['最新价'])
+                pct_chg = _safe_float(row['涨跌幅'])
+                if close and close > 0:
+                    result[code] = {
+                        "close": close,
+                        "pct_chg": pct_chg,
+                        "amount": _safe_float(row.get('成交额', None))
+                    }
+
+            if result:
+                logger.info(f"AKShare成功获取 {len(result)} 条行情数据")
+            else:
+                logger.warning("⚠️ AKShare未获取到任何有效数据")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"AKShare获取失败: {e}", exc_info=True)
+            return {}
+
     async def _fetch_from_sina(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
+        return await asyncio.to_thread(self._fetch_sina_sync, codes)
+
+    def _fetch_sina_sync(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
         try:
             import requests
             import re
@@ -319,6 +354,9 @@ class QuotesService:
             return {}
 
     async def _fetch_from_eastmoney(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
+        return await asyncio.to_thread(self._fetch_eastmoney_sync, codes)
+
+    def _fetch_eastmoney_sync(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
         try:
             import requests
 
@@ -358,6 +396,9 @@ class QuotesService:
             return {}
 
     async def _fetch_from_10jqka(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
+        return await asyncio.to_thread(self._fetch_10jqka_sync, codes)
+
+    def _fetch_10jqka_sync(self, codes: List[str]) -> Dict[str, Dict[str, Optional[float]]]:
         try:
             import requests
             import re

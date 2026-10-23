@@ -44,7 +44,7 @@ class ConfigService:
     async def _ensure_indexes(self):
         """确保索引已创建"""
         db = self.db
-        if not db:
+        if db is None:
             return
         
         # system_configs 集合索引
