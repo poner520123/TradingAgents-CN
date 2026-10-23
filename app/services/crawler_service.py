@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from app.core.config import settings
 from app.core.crawler_config import (
-    BASE_URL, get_random_headers, get_random_proxy, build_proxy_dict,
+    BASE_URL, EXPERT_URL, CRAWL_TEMPLATES, get_random_headers, get_random_proxy, build_proxy_dict,
     get_random_delay, should_insert_random_pause, get_random_pause,
     get_mandatory_pause, DELAY_CONFIG, EXCEPTION_CONFIG,
     get_exponential_backoff_delay, RATE_LIMIT_CONFIG, get_proxy_rate_limiter,
@@ -144,13 +144,19 @@ class CrawlerService:
         self.session.cookies.clear()
         logger.info("🍪 Cookies cleared")
 
-    def fetch_page(self, page_num):
-        """Fetch a specific page."""
+    def fetch_page(self, page_num, url_template=None):
+        """Fetch a specific page.
+
+        Args:
+            page_num: 页面号
+            url_template: URL 模板（可选，默认用 BASE_URL；用于同时爬伏击人+专家两个模板）
+        """
         if self._should_reset_session():
             self._reset_session()
             
         headers = get_random_headers()
-        url_base = BASE_URL.format(page_num)
+        template = url_template or BASE_URL
+        url_base = template.format(page_num)
         max_retries = EXCEPTION_CONFIG['max_retries']
         retries = 0
         
@@ -928,11 +934,12 @@ class CrawlerService:
         return stocks
 
     def crawl_pages(self, start_page, end_page, force=False):
-        """Crawl pages with enhanced thread stability.
+        """Crawl pages from BOTH templates (伏击人 + 专家), matching stockmonitor口径.
 
-        Crawls pages in [start_page, end_page] **once** without auto-expansion.
-        Caller controls how many pages to fetch.  Duplicate records are
-        skipped by MongoDB upsert on (user_name, stock_name, time).
+        每轮依次爬 fjzt-1.html(伏击人) 和 fjzt-2.html(专家)，各取 [start_page, end_page] 范围。
+        与 stockmonitor 的 WebTailer 双模板轮询保持一致，确保两边数据时间间隔对齐。
+
+        去重：save_data 按 (user_name, stock_name, time) upsert，两模板重复记录自动幂等。
         """
         if self.is_running and not force:
             logger.info("爬虫任务已经在执行中，跳过本次执行")
@@ -941,47 +948,45 @@ class CrawlerService:
         self.is_running = True
 
         try:
-            # 每次执行都重新计数，而不是累积计数
             self.__class__.total_pages_crawled = 0
             self.__class__.total_saved = 0
 
-            logger.info(f"🔍 开始爬取页面 {start_page}-{end_page}（固定范围，不自动扩页）")
+            # 依次爬两个模板（与 stockmonitor 一致）
+            for label, url_template in CRAWL_TEMPLATES:
+                logger.info(f"🔍 [{label}] 开始爬取页面 {start_page}-{end_page}")
 
-            for page in range(start_page, end_page + 1):
-                self.__class__.total_pages_crawled += 1
-                logger.debug(f"正在爬取第 {page} 页...")
-
-                html = self.fetch_page(page)
-                if not html:
-                    logger.warning(f"Page {page}: Failed to fetch")
-                    continue
-
-                data = self.parse_html(html)
-                if not data:
-                    logger.warning(f"Page {page}: No data or parsing failed")
-                    delay = get_random_delay("failure")
-                else:
-                    try:
-                        saved = self.save_data(data)
-                        self.__class__.total_saved += saved
-                        logger.debug(f"Page {page}: 成功保存 {saved} 条新数据 (总 {len(data)} 条)")
-                        delay = get_random_delay("success")
-                    except Exception as e:
-                        logger.error(f"Page {page}: Error saving data: {e}")
+                for page in range(start_page, end_page + 1):
+                    self.__class__.total_pages_crawled += 1
+                    html = self.fetch_page(page, url_template=url_template)
+                    if not html:
+                        logger.warning(f"[{label}] Page {page}: Failed to fetch")
                         delay = get_random_delay("failure")
+                    else:
+                        data = self.parse_html(html)
+                        if not data:
+                            logger.warning(f"[{label}] Page {page}: No data or parsing failed")
+                            delay = get_random_delay("failure")
+                        else:
+                            try:
+                                saved = self.save_data(data)
+                                self.__class__.total_saved += saved
+                                logger.debug(f"[{label}] Page {page}: 保存 {saved} 条 (总 {len(data)} 条)")
+                                delay = get_random_delay("success")
+                            except Exception as e:
+                                logger.error(f"[{label}] Page {page}: Error saving: {e}")
+                                delay = get_random_delay("failure")
 
-                # Add random pause if needed
-                if should_insert_random_pause():
-                    random_pause = get_random_pause()
-                    logger.debug(f"🔄 Inserting random pause: {random_pause:.2f}s")
-                    time.sleep(random_pause)
+                    if should_insert_random_pause():
+                        time.sleep(get_random_pause())
+                    time.sleep(delay)
 
-                logger.debug(f"⏱️ Waiting {delay:.2f}s before next request")
-                time.sleep(delay)
+                # 模板之间稍长一点的礼貌延迟
+                time.sleep(random.uniform(1.0, 2.0))
 
             logger.info(
                 f"✅ Crawl completed: Saved {self.__class__.total_saved} new records "
-                f"from {self.__class__.total_pages_crawled} pages"
+                f"from {self.__class__.total_pages_crawled} pages "
+                f"(双模板: 伏击人+专家)"
             )
             return self.__class__.total_saved
 

@@ -37,8 +37,8 @@ class FundRankingCrawler:
         
         # 资金排行数据源配置 - 使用东方财富新API接口
         self.fund_ranking_urls = {
-            'eastmoney': 'https://emappdata.eastmoney.com/stockrank/getbrand',
-            'eastmoney_v3': 'https://push2.eastmoney.com/api/qt/clist/get',
+            'eastmoney': settings.CRAWLER_EASTMONEY_POPULARITY_BRAND,
+            'eastmoney_v3': settings.CRAWLER_EASTMONEY_CLIST,
             'sina': 'https://finance.sina.com.cn/stock/sl/'
         }
         
@@ -192,7 +192,7 @@ class FundRankingCrawler:
     def _fetch_eastmoney_api(self):
         """使用人气排行API作为资金排行的替代方案"""
         # 使用人气排行API获取数据，然后转换为资金排行数据
-        url = 'https://emappdata.eastmoney.com/stockrank/getAllCurrentList'
+        url = settings.CRAWLER_EASTMONEY_POPULARITY_LIST
         
         if self._should_reset_session():
             self._reset_session()

@@ -6,9 +6,24 @@ import socket
 from typing import List, Dict, Optional
 import os
 
-# 模拟真实浏览器的请求头配置
+# 从 Settings 读取爬虫目标路径，集中管理
+try:
+    from app.core.config import settings
+    BASE_URL = settings.CRAWLER_178448_AMATEUR
+    EXPERT_URL = settings.CRAWLER_178448_EXPERT
+    SITE_BASE = settings.CRAWLER_178448_BASE
+except Exception:
+    # 模块首次加载失败时的兜底（settings 可能还未初始化）
+    BASE_URL = "https://www.178448.com/fjzt-1.html?page={}"
+    EXPERT_URL = "https://www.178448.com/fjzt-2.html?page={}"
+    SITE_BASE = "https://www.178448.com"
 
-BASE_URL = "https://www.178448.com/fjzt-1.html?page={}"
+# 两个目标模板：伏击人（普通） + 专家
+# 与 stockmonitor 直连爬虫口径一致，确保两边数据时间间隔对齐
+CRAWL_TEMPLATES = [
+    ("伏击人", BASE_URL),
+    ("专家", EXPERT_URL),
+]
 
 # Enhanced browser user agents collection for rotation
 USER_AGENTS = [
@@ -45,8 +60,8 @@ BASE_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
-    "Referer": "https://www.178448.com/",
-    "Origin": "https://www.178448.com",
+    "Referer": SITE_BASE + "/",
+    "Origin": SITE_BASE,
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
     "Sec-Ch-Ua-Mobile": "?0",

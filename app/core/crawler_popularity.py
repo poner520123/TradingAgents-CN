@@ -37,8 +37,8 @@ class PopularityRankingCrawler:
         
         # 人气排行数据源配置 - 使用东方财富新API接口
         self.popularity_ranking_urls = {
-            'eastmoney': 'https://emappdata.eastmoney.com/stockrank/getAllCurrentList',
-            'eastmoney_v3': 'https://push2.eastmoney.com/api/qt/clist/get',
+            'eastmoney': settings.CRAWLER_EASTMONEY_POPULARITY_LIST,
+            'eastmoney_v3': settings.CRAWLER_EASTMONEY_CLIST,
             'sina': 'https://finance.sina.com.cn/stock/sl/'
         }
         

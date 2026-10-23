@@ -3,12 +3,19 @@ import time
 from urllib.parse import urlencode
 from ..items import CapitalFlowItem
 
+try:
+    from app.core.config import settings
+    _EASTMONEY_CLIST = settings.CRAWLER_EASTMONEY_CLIST
+except Exception:
+    _EASTMONEY_CLIST = "http://push2.eastmoney.com/api/qt/clist/get"
+
+
 class CapitalFlowSpider(scrapy.Spider):
     name = "capital_flow"
     allowed_domains = ["eastmoney.com"]
 
     def start_requests(self):
-        url = "http://push2.eastmoney.com/api/qt/clist/get"
+        url = _EASTMONEY_CLIST
         params = {
             "fid": "f62",
             "po": 1,

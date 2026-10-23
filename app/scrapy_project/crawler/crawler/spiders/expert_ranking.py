@@ -5,11 +5,22 @@ import re
 import datetime
 from ..items import ExpertRankingItem
 
+# 从 Settings 读取爬虫目标路径
+try:
+    from app.core.config import settings
+    _SITE_BASE = settings.CRAWLER_178448_BASE
+    _EXPERT_TMPL = settings.CRAWLER_178448_EXPERT
+    _AMATEUR_TMPL = settings.CRAWLER_178448_AMATEUR
+except Exception:
+    _SITE_BASE = "https://www.178448.com"
+    _EXPERT_TMPL = "https://www.178448.com/fjzt-2.html?page={}"
+    _AMATEUR_TMPL = "https://www.178448.com/fjzt-1.html?page={}"
+
 
 class ExpertRankingSpider(scrapy.Spider):
     name = "expert_ranking"
     allowed_domains = ['178448.com', 'www.178448.com']
-    start_urls = ['https://www.178448.com/fjzt-2.html?page=1', 'https://www.178448.com/fjzt-1.html?page=1']
+    start_urls = [_EXPERT_TMPL.format(1), _AMATEUR_TMPL.format(1)]
     
     def __init__(self):
         self.max_pages = 10  # 最大爬取页面数
@@ -40,7 +51,7 @@ class ExpertRankingSpider(scrapy.Spider):
             
             headers = {
                 'User-Agent': user_agent,
-                'Referer': 'https://www.178448.com/',
+                'Referer': _SITE_BASE + '/',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                 'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
                 'Accept-Encoding': 'gzip, deflate, br',

@@ -285,6 +285,32 @@ class Settings(BaseSettings):
     CRAWLER_INTERVAL_MINUTES: int = Field(default=1, description="爬虫自动执行间隔（分钟）")
     CRAWLER_PAGES_PER_RUN: int = Field(default=3, description="爬虫每次执行的最新页面数")
 
+    # 爬虫目标网页路径 — 集中管理，改域名/改版只需改这里
+    CRAWLER_178448_BASE: str = Field(
+        default="https://www.178448.com",
+        description="股海明灯主站域名（含协议）",
+    )
+    CRAWLER_178448_EXPERT: str = Field(
+        default="https://www.178448.com/fjzt-2.html?page={}",
+        description="股海明灯专家排行分页模板",
+    )
+    CRAWLER_178448_AMATEUR: str = Field(
+        default="https://www.178448.com/fjzt-1.html?page={}",
+        description="股海明灯伏击人分页模板",
+    )
+    CRAWLER_EASTMONEY_POPULARITY_LIST: str = Field(
+        default="https://emappdata.eastmoney.com/stockrank/getAllCurrentList",
+        description="东方财富人气排行 API",
+    )
+    CRAWLER_EASTMONEY_POPULARITY_BRAND: str = Field(
+        default="https://emappdata.eastmoney.com/stockrank/getbrand",
+        description="东方财富人气品牌 API",
+    )
+    CRAWLER_EASTMONEY_CLIST: str = Field(
+        default="http://push2.eastmoney.com/api/qt/clist/get",
+        description="东方财富行情列表 clist API（资金流等也用）",
+    )
+
     @property
     def is_production(self) -> bool:
         """是否为生产环境"""

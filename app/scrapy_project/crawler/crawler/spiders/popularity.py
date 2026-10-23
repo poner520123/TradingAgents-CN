@@ -4,13 +4,24 @@ import random
 import time
 from ..items import PopularityItem
 
+try:
+    from app.core.config import settings
+    _POP_LIST = settings.CRAWLER_EASTMONEY_POPULARITY_LIST
+    _POP_BRAND = settings.CRAWLER_EASTMONEY_POPULARITY_BRAND
+    _EASTMONEY_CLIST = settings.CRAWLER_EASTMONEY_CLIST
+except Exception:
+    _POP_LIST = "https://emappdata.eastmoney.com/stockrank/getAllCurrentList"
+    _POP_BRAND = "https://emappdata.eastmoney.com/stockrank/getbrand"
+    _EASTMONEY_CLIST = "http://push2.eastmoney.com/api/qt/clist/get"
+
+
 class PopularitySpider(scrapy.Spider):
     name = "popularity"
     allowed_domains = ["eastmoney.com"]
     
     def start_requests(self):
         # 尝试 API v1
-        url = "https://emappdata.eastmoney.com/stockrank/getAllCurrentList"
+        url = _POP_LIST
         payload = {
             "appId": "appId01",
             "globalId": f"{random.randint(100000, 999999)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
@@ -46,7 +57,7 @@ class PopularitySpider(scrapy.Spider):
         yield from self.start_v2()
 
     def start_v2(self):
-        url = "https://emappdata.eastmoney.com/stockrank/getbrand"
+        url = _POP_BRAND
         payload = {
             "appId": "appId01",
             "globalId": f"{random.randint(100000, 999999)}-{random.randint(1000, 9999)}",
@@ -86,7 +97,7 @@ class PopularitySpider(scrapy.Spider):
         yield from self.start_v3()
 
     def start_v3(self):
-        url = "http://push2.eastmoney.com/api/qt/clist/get"
+        url = _EASTMONEY_CLIST
         params = {
             "fid": "f8", # 换手率
             "po": 1,
