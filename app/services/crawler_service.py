@@ -414,36 +414,51 @@ class CrawlerService:
         return data_list
 
     def save_data(self, data_list):
-        """Save data to MongoDB with upsert."""
+        """Save data to MongoDB with upsert.
+
+        过滤链：
+          1. ST 股票（parse_html 前置过滤 + save_data 二次校验）
+          2. 板块过滤（仅主板 600/601/603/605/000/001/002/003 + 创业板 300/301）
+             排除 科创板 688、北交所 4/8/92 开头、基金 ETF 转债 5xxxxx/1xxxxx
+        """
         self._init_db()
         if not data_list:
             return 0
-            
+
         # 导入ST过滤服务（延迟导入避免循环依赖）
         from app.services.st_filter_service import st_filter_service
-        
+
         # 【二次校验】检查是否存在遗漏的ST股票（第二步过滤）
         validation_result = st_filter_service.filter_st_stocks(data_list)
         filtered_data = validation_result['filtered']
         removed_count = validation_result['removed_count']
-        
+
         if removed_count > 0:
             logger.info(f"🔍 [二次校验] 发现并过滤 {removed_count} 只遗漏的ST股票")
-        
+
         count = 0
+        excluded_board = 0
         # Import here to avoid circular import
         from app.services.stock_map_service import stock_map_service
-        
+
         for item in filtered_data:
             try:
                 # Add timestamp
                 item['crawled_at'] = datetime.utcnow()
-                
+
                 # Add stock_code to item
                 if 'stock_name' in item:
                     stock_code = stock_map_service.get_code_by_name(item['stock_name'])
                     item['stock_code'] = stock_code
-                    
+
+                    # 【板块过滤】仅保留主板和创业板，排除科创板/北交所/基金ETF转债
+                    if stock_code and not self._is_main_board_or_chinext(stock_code):
+                        excluded_board += 1
+                        logger.debug(
+                            f"🟡 [板块过滤] 非主板/创业板排除: {item['stock_name']} ({stock_code})"
+                        )
+                        continue
+
                     # 【最终过滤】在存储前再次检查ST状态（第三步过滤）
                     if st_filter_service.is_st_stock_by_code(stock_code):
                         logger.warning(f"🔴 [最终过滤] 通过股票代码检测到ST股票: {item['stock_name']} ({stock_code})")
@@ -472,7 +487,33 @@ class CrawlerService:
                     count += 1
             except Exception as e:
                 logger.error(f"Error saving data: {e}")
+        if excluded_board > 0:
+            logger.info(f"🟡 [板块过滤] 共排除 {excluded_board} 只非主板/创业板股票")
         return count
+
+    @staticmethod
+    def _is_main_board_or_chinext(stock_code: str) -> bool:
+        """判断股票代码是否属于主板或创业板（是返回 True）。
+
+        保留：600/601/603/605 沪市主板、000/001/002/003 深市主板、300/301 创业板。
+        排除：688 科创板、4xxxx/8xxxx/92xxx 北交所、5xxxxx 基金 ETF、1xxxxx 转债等。
+        stock_code 为空或非 6 位数字 → 视为不属于（保守排除）。
+        """
+        code = str(stock_code or "").strip()
+        if len(code) != 6 or not code.isdigit():
+            return False
+        first = code[0]
+        # 沪市主板：600/601/603/605
+        if code.startswith(("600", "601", "603", "605")):
+            return True
+        # 深市主板：000/001/002/003
+        if code.startswith(("000", "001", "002", "003")):
+            return True
+        # 创业板：300/301
+        if code.startswith(("300", "301")):
+            return True
+        # 其他：688 科创板、4xx 北交、8xx 北交、92x 北交、5xx 基金 ETF、1xx 转债等一律排除
+        return False
     
     def update_historical_stock_codes(self):
         """更新历史爬虫数据中的股票代码"""
