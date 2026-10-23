@@ -379,17 +379,16 @@ def _register_crawlers(scheduler: AsyncIOScheduler) -> None:
     scrapy_service = ScrapyCrawlerService()
 
     async def run_all_crawlers():
-        """运行所有爬虫任务 - 包括CrawlerService和ScrapyCrawlerService"""
+        """运行所有爬虫任务 - 包括CrawlerService(双模板)和ScrapyCrawlerService"""
         try:
             logger.info("开始执行所有爬虫任务...")
 
-            # 1. 运行CrawlerService爬虫 - 使用asyncio.to_thread()避免阻塞事件循环
-            # 每次只爬最新的 N 页，save_data 按 (user_name, stock_name, time) upsert
-            # 天然幂等，已入库的数据会被跳过，只计数真正新增的
+            # 1. CrawlerService - 依次爬 fjzt-1(伏击人) + fjzt-2(专家)，每页 N 页
+            # save_data 按 (user_name, stock_name, time) upsert，幂等跳过已入库
             pages_per_run = settings.CRAWLER_PAGES_PER_RUN
             crawler_total = await asyncio.to_thread(crawler_service.crawl_pages, 1, pages_per_run)
             logger.info(
-                f"CrawlerService爬虫完成: 爬取最新 {pages_per_run} 页，"
+                f"CrawlerService爬虫完成: 伏击人+专家各 {pages_per_run} 页（共 {pages_per_run * 2} 页），"
                 f"新增 {crawler_total} 条数据"
             )
 
@@ -414,7 +413,8 @@ def _register_crawlers(scheduler: AsyncIOScheduler) -> None:
     )
     logger.info(
         f"所有爬虫任务已配置: 每 {interval_minutes} 分钟执行一次，"
-        f"每次爬取最新 {settings.CRAWLER_PAGES_PER_RUN} 页"
+        f"CrawlerService 爬伏击人+专家各 {settings.CRAWLER_PAGES_PER_RUN} 页，"
+        f"Scrapy 爬东方财富人气/资金流/专家排行"
     )
 
     # 立即执行一次爬虫任务 - 移到后台任务执行，避免阻塞服务器启动
